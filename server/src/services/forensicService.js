@@ -146,7 +146,36 @@ class ForensicService {
       });
     }
 
-    // 5. Motores de Video o Audio IA (Sora, Runway, Pika, Suno, ElevenLabs)
+    // 5. Inpainting, Generative Fill y Edición Generativa sobre Fotos Reales
+    if (lowerBuffer.includes('generative fill') || lowerBuffer.includes('generative_fill') || lowerBuffer.includes('adobe firefly') || lowerBuffer.includes('firefly') || lowerBuffer.includes('adobe:generative')) {
+      findings.push({
+        type: 'ADOBE_FIREFLY_GENERATIVE',
+        detail: 'Firma de Adobe Firefly / Generative Fill (Relleno Generativo con IA) detectada'
+      });
+    }
+
+    if (lowerBuffer.includes('inpaint') || lowerBuffer.includes('inpainting') || lowerBuffer.includes('latent_mask') || lowerBuffer.includes('denoising_strength') || lowerBuffer.includes('controlnet')) {
+      findings.push({
+        type: 'DIFFUSION_INPAINTING',
+        detail: 'Parámetros de edición generativa / Inpainting por difusión latente'
+      });
+    }
+
+    if (lowerBuffer.includes('faceswap') || lowerBuffer.includes('roop') || lowerBuffer.includes('reactor') || lowerBuffer.includes('insightface')) {
+      findings.push({
+        type: 'AI_FACE_SWAP',
+        detail: 'Firma de suplantación facial neuronal / Face Swap profundo (Deepfake biométrico)'
+      });
+    }
+
+    if (lowerBuffer.includes('remini') || lowerBuffer.includes('photoroom') || lowerBuffer.includes('topaz') || lowerBuffer.includes('clipdrop') || lowerBuffer.includes('seaart') || lowerBuffer.includes('krea')) {
+      findings.push({
+        type: 'AI_ENHANCER_APP',
+        detail: 'Firma de aplicación de mejora/reconstrucción neuronal de imagen (Remini/PhotoRoom/Clipdrop)'
+      });
+    }
+
+    // 6. Motores de Video o Audio IA (Sora, Runway, Pika, Suno, ElevenLabs)
     if (lowerBuffer.includes('elevenlabs') || lowerBuffer.includes('suno.ai') || lowerBuffer.includes('udio')) {
       findings.push({
         type: 'AI_AUDIO_SYNTHESIS',
@@ -372,7 +401,7 @@ class ForensicService {
       }
     }
 
-    // Análisis de uniformidad en tablas DQT
+    // Análisis de uniformidad y origen en tablas DQT
     let isSyntheticDqt = false;
     if (dqtTables.length > 0) {
       const firstTable = dqtTables[0];
@@ -382,8 +411,8 @@ class ForensicService {
       let variance = 0;
       for (let i = 0; i < firstTable.length; i++) variance += Math.pow(firstTable[i] - mean, 2);
       const stdDev = Math.sqrt(variance / firstTable.length);
-      // Las matrices extremadamente planas o con valores fijos son características de exportadores sintéticos/headless
-      if (stdDev < 4.5 && mean > 8) {
+      // Las matrices extremadamente planas, con valores uniformes o con 1 sola tabla en JPEG son de renderizadores sintéticos
+      if ((stdDev < 6.8 && mean > 5) || dqtTables.length === 1) {
         isSyntheticDqt = true;
       }
     }
@@ -535,24 +564,32 @@ class ForensicService {
 
     if (binaryFindings && binaryFindings.length > 0) {
       for (const f of binaryFindings) {
-        if (f.type === 'IPTC_AI_STANDARD' || f.type === 'GOOGLE_SYNTHID') {
-          v1_aiRaw += 88.0;
-          const desc = `Marca de agua / Estándar IA: ${f.detail}`;
+        if (f.type === 'IPTC_AI_STANDARD' || f.type === 'GOOGLE_SYNTHID' || f.type === 'ADOBE_FIREFLY_GENERATIVE' || f.type === 'DIFFUSION_INPAINTING' || f.type === 'AI_FACE_SWAP') {
+          v1_aiRaw += 92.0;
+          const desc = `Marca / Inpainting IA: ${f.detail}`;
           aiFindings.push(desc);
           anomalies.push(`[IA] ${desc}`);
           if (f.type === 'GOOGLE_SYNTHID') detectedAiModels.push('Google SynthID Watermark');
+          else detectedAiModels.push(f.detail);
+        } else if (f.type === 'AI_ENHANCER_APP') {
+          v1_aiRaw += 82.0;
+          const desc = `Reconstrucción Neuronal: ${f.detail}`;
+          aiFindings.push(desc);
+          anomalies.push(`[IA] ${desc}`);
+          detectedAiModels.push('App de Retoque Neuronal IA');
         } else if (f.type === 'DIFFUSION_PROMPT_METADATA' || f.type === 'OPENAI_DALLE' || f.type === 'MIDJOURNEY_SIGNATURE') {
-          v1_aiRaw += 84.0;
+          v1_aiRaw += 88.0;
           const desc = `Parámetro generativo extraído: ${f.detail}`;
           aiFindings.push(desc);
           anomalies.push(`[IA] ${desc}`);
+          detectedAiModels.push(f.detail);
         } else if (f.type === 'C2PA_MANIFEST') {
-          v1_aiRaw += 40.0;
+          v1_aiRaw += 65.0;
           const desc = `Metadatos de Procedencia C2PA: ${f.detail}`;
           aiFindings.push(desc);
           anomalies.push(`[IA] ${desc}`);
         } else {
-          v1_aiRaw += 45.0;
+          v1_aiRaw += 75.0;
           const desc = `Firma sintética detectada: ${f.detail}`;
           aiFindings.push(desc);
           anomalies.push(`[IA] ${desc}`);
@@ -592,8 +629,17 @@ class ForensicService {
       }
 
       if (pixelAnalysis.isSyntheticDqt) {
-        v1_aiRaw += 35.0;
-        anomalies.push(`[TABLA DQT] Estructura de cuantización sintética uniforme detectada en marcadores binarios JPEG.`);
+        v1_aiRaw += 86.0;
+        const desc = `Tabla de Cuantización Sintética (DQT): Estructura de compresión artificial no analógica. No generada por sensor físico, característica de renderizadores de IA o pipelines headless`;
+        aiFindings.push(desc);
+        anomalies.push(`[TABLA DQT] ${desc}`);
+        detectedAiModels.push('Renderizador Sintético IA / Pipeline Digital');
+        if (metadata.Make || metadata.Model) {
+          v2_manualRaw += 75.0;
+          const hybridDesc = `Inconsistencia Híbrida Sensor-Cuantización: El archivo declara sensor óptico (${metadata.Make || 'Cámara'}) pero contiene tablas de compresión sintética de IA (evidencia de Inpainting / Generative Fill)`;
+          manualFindings.push(hybridDesc);
+          anomalies.push(`[MANIPULACIÓN HÍBRIDA] ${hybridDesc}`);
+        }
       }
     }
 
@@ -711,7 +757,7 @@ class ForensicService {
     const W4 = 0.12; // Procedencia Óptica
     const W5 = 0.08; // Modulación Social
 
-    const isAiPixelSignature = pixelAnalysis && (pixelAnalysis.isAiDimensionSignature || (pixelAnalysis.isSquare && !hasCameraMake));
+    const isAiPixelSignature = pixelAnalysis && (pixelAnalysis.isAiDimensionSignature || (pixelAnalysis.isSquare && !hasCameraMake) || pixelAnalysis.isSyntheticDqt);
     const v1_capped = Math.min(100.0, v1_aiRaw);
     const v2_capped = Math.min(100.0, v2_manualRaw);
     const v3_capped = Math.min(100.0, v3_binaryRaw);
@@ -725,13 +771,18 @@ class ForensicService {
       (v4_capped * W4) + 
       (v5_social * W5);
 
-    // Si hay evidencia irrefutable de IA (SynthID, IPTC o Prompt), el piso de riesgo es alto
-    if (v1_capped >= 75.0) {
-      aggregateRawScore = Math.max(aggregateRawScore, 85.0 + (v1_capped * 0.12));
+    // REGLA FUNDAMENTAL DE INFERENCIA FORENSE:
+    // Un indicio de IA o manipulación jamás puede ser diluido por ponderaciones lineales pasivas.
+    if (v1_capped >= 70.0) {
+      aggregateRawScore = Math.max(aggregateRawScore, 88.0 + (v1_capped * 0.10));
+    } else if (v1_capped >= 30.0) {
+      aggregateRawScore = Math.max(aggregateRawScore, 72.0 + (v1_capped * 0.20));
+    } else if (v2_capped >= 50.0) {
+      aggregateRawScore = Math.max(aggregateRawScore, 75.0 + (v2_capped * 0.15));
     }
 
-    // Aplicar descuento por autenticidad óptica comprobada (si no hay IA confirmada)
-    if (v1_capped < 30.0 && opticalBonusCredits > 0) {
+    // Aplicar descuento por autenticidad óptica comprobada (SOLO si NO existe sospecha de IA ni retoque)
+    if (v1_capped < 15.0 && v2_capped < 20.0 && opticalBonusCredits > 0) {
       aggregateRawScore = Math.max(0.0, aggregateRawScore - opticalBonusCredits);
     }
 
@@ -755,16 +806,28 @@ class ForensicService {
     let forensicHypothesis = '';
     let expertRecommendations = [];
 
-    if (v1_capped >= 60.0 || riskScore >= 75.0) {
-      predictiveCategory = 'SINTETICO_IA_GENERATIVA';
-      certaintyPercentage = Number(Math.min(99.4, 88.0 + (riskScore * 0.11)).toFixed(1));
-      confidenceLevel = certaintyPercentage >= 95 ? 'EXTREMA' : 'ALTA';
-      forensicHypothesis = `Probabilidad crítica (${certaintyPercentage}%) de generación sintética por red neuronal o modelo fundacional. Se constatan patrones de cuantización algorítmica y ausencia total de ruido analógico de sensor óptico fotográfico.`;
-      expertRecommendations = [
-        'Clasificar la prueba como material generado por IA en el expediente de auditoría.',
-        'Solicitar al emisor el prompt de origen o manifiesto criptográfico C2PA.',
-        'Descartar valor pericial como testimonio fotográfico analógico.'
-      ];
+    if (v1_capped >= 50.0 || riskScore >= 70.0) {
+      if (hasCameraMake) {
+        predictiveCategory = 'FOTO_REAL_MANIPULADA_CON_IA';
+        certaintyPercentage = Number(Math.min(99.6, 91.0 + (riskScore * 0.08)).toFixed(1));
+        confidenceLevel = 'EXTREMA';
+        forensicHypothesis = `Probabilidad crítica (${certaintyPercentage}%) de manipulación generativa híbrida sobre fotografía real (${metadata.Make || 'Cámara'}). Se constatan firmas de cuantización sintética y discontinuidades algorítmicas compatibles con Inpainting / Generative Fill / Face Swap.`;
+        expertRecommendations = [
+          'Clasificar como fotografía real modificada por IA (Inpainting / Generative Fill / Face Swap).',
+          'Solicitar archivo negativo RAW original del dispositivo captor.',
+          'Inspeccionar mapa de residuos ELA en el visor pericial para localizar las zonas de inserción sintética.'
+        ];
+      } else {
+        predictiveCategory = 'SINTETICO_IA_GENERATIVA';
+        certaintyPercentage = Number(Math.min(99.4, 88.0 + (riskScore * 0.11)).toFixed(1));
+        confidenceLevel = certaintyPercentage >= 95 ? 'EXTREMA' : 'ALTA';
+        forensicHypothesis = `Probabilidad crítica (${certaintyPercentage}%) de generación sintética por red neuronal o modelo fundacional. Se constatan patrones de cuantización algorítmica y ausencia total de ruido analógico de sensor óptico fotográfico.`;
+        expertRecommendations = [
+          'Clasificar la prueba como material generado por IA en el expediente de auditoría.',
+          'Solicitar al emisor el prompt de origen o manifiesto criptográfico C2PA.',
+          'Descartar valor pericial como testimonio fotográfico analógico.'
+        ];
+      }
     } else if (v2_capped >= 45.0 || (riskScore >= 50.0 && !whatsAppInfo)) {
       predictiveCategory = 'ALTERACION_MANUAL_RETOQUE';
       certaintyPercentage = Number(Math.min(98.2, 76.0 + (riskScore * 0.14)).toFixed(1));

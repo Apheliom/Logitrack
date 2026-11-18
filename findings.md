@@ -70,7 +70,19 @@ SecuriTrace es una plataforma de análisis forense digital multimedia, verificac
     2. `uploaderGps`: Telemetría del navegador/terminal del auditor en el instante de la ingesta pericial, rotulada explícitamente como *"Punto de Ingesta Pericial (Ubicación del Auditor)"*.
   - El cálculo de discrepancia espacial y alerta de spoofing se ejecuta única y exclusivamente cuando ambos puntos (`photoGps` y `uploaderGps`) coexisten simultáneamente.
 
-## Análisis Forense en el Dominio Visual y de Píxeles (Detección de IA en Tránsito por WhatsApp)
+## Detección de Manipulación Híbrida (Foto Real Modificada con IA / Inpainting)
+- **Causa Raíz del 86.6% de Autenticidad y Vector IA al 35%:**
+  - Cuando una imagen partía de una foto real pero era manipulada con IA (Inpainting, Generative Fill, Face Swap), `pixelAnalysis.isSyntheticDqt` asignaba únicamente `v1_aiRaw += 35.0`.
+  - La ponderación lineal bayesiana ($W_1 = 0.35$) multiplicaba $35.0 \times 0.35 = 12.25\%$.
+  - Si la foto retenía metadatos de cámara (`Make/Model`), `opticalBonusCredits` atenuaba el riesgo o la ausencia de piso para valores $< 75\%$ dejaba el riesgo en $13.4\%$, resultando en una autenticidad espuria de **$86.6\%$**.
+- **Solución Forense Implementada:**
+  1. **Calibración de Cuantización DQT Sintética:** La detección de matrices DCT no ópticas (`isSyntheticDqt`) pasa a ponderar $+80.0$ en el Vector 1.
+  2. **Detección de Manipulación Híbrida (`hasCameraMake + isSyntheticDqt`):** Si un archivo contiene marca de cámara pero tabla de cuantización sintética o marcadores de inpainting, se tipifica como `FOTO_REAL_MANIPULADA_CON_IA`, elevando simultáneamente el Vector 1 (IA) y el Vector 2 (Edición Manual).
+  3. **Piso de Inferencia No Lineal:** Ninguna señal de IA $\ge 30\%$ puede ser diluida por ponderaciones pasivas:
+     - Si $V_1 \ge 30\%$, se fija un piso de riesgo mínimo de $65\% + (V_1 \times 0.25)$.
+     - Si $V_1 \ge 70\%$, se fija un piso de riesgo de $88\% + (V_1 \times 0.10)$.
+  4. **Expansión de Firmas Binarias de Inpainting y Generative Fill:** Escaneo de tokens de Adobe Firefly (`generative_fill`, `c2pa.actions`), Stable Diffusion (`inpaint`, `latent_mask`), y motores de suplantación facial (`faceswap`, `roop`, `reactor`).
+
 - **Brecha Detectada:** Las imágenes generadas por IA (Midjourney, DALL-E, SDXL, Flux) enviadas a través de WhatsApp pierden metadatos textuales e IPTC debido a la recompresión con `libjpeg-turbo`. Dado que `whatsAppInfo` atenuaba la ausencia de metadatos EXIF, el motor calculaba un 98.8% de autenticidad.
 - **Factores Forenses en el Dominio de Píxeles:**
   1. **Dimensiones y Relación de Aspecto Canónicas de IA:**

@@ -11,7 +11,7 @@ import { ProvenanceTimeline } from './common/ProvenanceTimeline';
 import ThreatRadarDeck from './common/ThreatRadarDeck';
 import ForensicGeoMap from './common/ForensicGeoMap';
 import PixelForensicViewer from './common/PixelForensicViewer';
-import { humanizeForensicText, humanizeForensicDate, humanizeTechnicalParam } from '../utils/forensicFormatter';
+import { humanizeForensicText, humanizeForensicDate, humanizeTechnicalParam, humanizePredictiveCategory } from '../utils/forensicFormatter';
 
 export default function FileAnalyzer() {
   const {
@@ -422,7 +422,7 @@ export default function FileAnalyzer() {
                           <span>MOTOR DE PREDICCIÓN & INFERENCIA PROBABILÍSTICA (FCE v3.0)</span>
                         </h4>
                         <span className="text-[10px] text-zinc-400">
-                          Dictamen: <strong className="text-cyan-300">{fileAnalysisResult.forensicPrediction.predictiveCategory}</strong>
+                          Dictamen: <strong className="text-cyan-300">{humanizePredictiveCategory(fileAnalysisResult.forensicPrediction.predictiveCategory)}</strong>
                         </span>
                       </div>
                     </div>

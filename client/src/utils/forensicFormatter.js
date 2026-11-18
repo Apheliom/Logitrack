@@ -143,3 +143,26 @@ export function humanizeTechnicalParam(key, value) {
 
   return humanizeForensicText(str);
 }
+
+/**
+ * Traduce las categorías predictivas estructuradas del motor FCE v3.0 a rótulos periciales de alta claridad
+ */
+export function humanizePredictiveCategory(category) {
+  if (!category) return 'NO CLASIFICADO';
+  switch (category) {
+    case 'FOTO_REAL_MANIPULADA_CON_IA':
+      return 'FOTOGRAFÍA REAL MANIPULADA CON IA (INPAINTING / GENERATIVE FILL)';
+    case 'SINTETICO_IA_GENERATIVA':
+      return 'SINTÉTICO POR IA GENERATIVA (MODELO DE DIFUSIÓN / NEURONAL)';
+    case 'ALTERACION_MANUAL_RETOQUE':
+      return 'ALTERACIÓN MANUAL / FOTOMONTAJE GRÁFICO';
+    case 'TRANSITO_RED_SOCIAL_SANITIZADO':
+      return 'TRÁNSITO POR RED SOCIAL (METADATOS PURGADOS POR PLATAFORMA)';
+    case 'CAPTURA_OPTICA_GENUINA':
+      return 'CAPTURA ÓPTICA GENUINA (INTEGRIDAD SENSOR CONFIRMADA)';
+    case 'PDF_SINTETICO_LLM':
+      return 'DOCUMENTO SINTÉTICO (GENERADO POR LLM / MOTOR VIRTUAL)';
+    default:
+      return category;
+  }
+}
