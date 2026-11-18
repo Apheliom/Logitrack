@@ -240,6 +240,174 @@ class ForensicService {
   }
 
   /**
+   * Extrae dimensiones de imagen directas de cabeceras binarias (JPEG SOF, PNG IHDR, WebP)
+   */
+  static extractImageDimensions(buffer, rawMetadata = {}) {
+    let width = rawMetadata.ImageWidth || rawMetadata.ExifImageWidth || rawMetadata.width || null;
+    let height = rawMetadata.ImageHeight || rawMetadata.ExifImageHeight || rawMetadata.height || null;
+
+    if (width && height && typeof width === 'number' && typeof height === 'number') {
+      return { width, height };
+    }
+
+    if (!buffer || buffer.length < 16) {
+      return { width: null, height: null };
+    }
+
+    // JPEG SOF0 / SOF1 / SOF2 Parser (0xFF 0xC0 .. 0xC3)
+    if (buffer[0] === 0xFF && buffer[1] === 0xD8) {
+      let offset = 2;
+      while (offset < buffer.length - 8) {
+        if (buffer[offset] !== 0xFF) {
+          offset++;
+          continue;
+        }
+        const marker = buffer[offset + 1];
+        if ((marker >= 0xC0 && marker <= 0xC3) || (marker >= 0xC9 && marker <= 0xCB)) {
+          height = buffer.readUInt16BE(offset + 5);
+          width = buffer.readUInt16BE(offset + 7);
+          return { width, height };
+        }
+        if (offset + 3 < buffer.length) {
+          const length = buffer.readUInt16BE(offset + 2);
+          offset += 2 + length;
+        } else {
+          break;
+        }
+      }
+    }
+
+    // PNG Parser (IHDR chunk at byte 16)
+    if (buffer[0] === 0x89 && buffer[1] === 0x50 && buffer[2] === 0x4E && buffer[3] === 0x47) {
+      if (buffer.length >= 24) {
+        width = buffer.readUInt32BE(16);
+        height = buffer.readUInt32BE(20);
+        return { width, height };
+      }
+    }
+
+    // WebP Parser
+    if (buffer.length >= 30 && buffer.toString('ascii', 0, 4) === 'RIFF' && buffer.toString('ascii', 8, 12) === 'WEBP') {
+      const type = buffer.toString('ascii', 12, 16);
+      if (type === 'VP8 ' && buffer.length >= 30) {
+        width = buffer.readUInt16LE(26) & 0x3fff;
+        height = buffer.readUInt16LE(28) & 0x3fff;
+        return { width, height };
+      } else if (type === 'VP8L' && buffer.length >= 25) {
+        const b0 = buffer[21], b1 = buffer[22], b2 = buffer[23], b3 = buffer[24];
+        width = 1 + (((b1 & 0x3F) << 8) | b0);
+        height = 1 + (((b3 & 0xF) << 10) | (b2 << 2) | ((b1 & 0xC0) >> 6));
+        return { width, height };
+      }
+    }
+
+    return { width: null, height: null };
+  }
+
+  /**
+   * Análisis Forense en el Dominio Visual y de Píxeles
+   * Identifica huellas de difusión latente, resolución canónica de IA, aspecto 1:1 y tablas DQT
+   */
+  static analyzePixelAndVisualDomain(buffer, rawMetadata = {}, magicInfo = {}) {
+    const isImage = magicInfo.detectedFormat === 'JPEG' || magicInfo.detectedFormat === 'PNG' || magicInfo.detectedFormat === 'WEBP' || (magicInfo.category === 'IMAGE');
+    if (!isImage || !buffer) {
+      return null;
+    }
+
+    const { width, height } = this.extractImageDimensions(buffer, rawMetadata);
+    if (!width || !height) {
+      return null;
+    }
+
+    const ratio = width / height;
+    const isSquare = Math.abs(ratio - 1.0) < 0.018;
+
+    let aspectRatioLabel = 'Desconocida';
+    if (isSquare) aspectRatioLabel = '1:1 (Cuadrícula Cuadrada)';
+    else if (Math.abs(ratio - (4 / 3)) < 0.03) aspectRatioLabel = '4:3 (Sensor Óptico Estándar)';
+    else if (Math.abs(ratio - (3 / 4)) < 0.03) aspectRatioLabel = '3:4 (Sensor Óptico Vertical)';
+    else if (Math.abs(ratio - (16 / 9)) < 0.04) aspectRatioLabel = '16:9 (Panorámico Digital)';
+    else if (Math.abs(ratio - (9 / 16)) < 0.04) aspectRatioLabel = '9:16 (Vertical Smartphone)';
+    else if (Math.abs(ratio - (3 / 2)) < 0.03) aspectRatioLabel = '3:2 (Sensor DSLR 35mm)';
+    else if (Math.abs(ratio - (2 / 3)) < 0.03) aspectRatioLabel = '2:3 (Sensor DSLR Vertical)';
+    else aspectRatioLabel = `${ratio.toFixed(2)}:1`;
+
+    // Resoluciones canónicas de modelos fundacionales de difusión latente
+    const aiResolutionPresets = [
+      { w: 1024, h: 1024, name: 'Midjourney v5/v6 / SDXL / DALL-E 3 (1024x1024)' },
+      { w: 512, h: 512, name: 'Stable Diffusion 1.4/1.5 Base (512x512)' },
+      { w: 768, h: 768, name: 'Stable Diffusion 2.0/2.1 (768x768)' },
+      { w: 2048, h: 2048, name: 'Midjourney Upscaled / Flux 2K (2048x2048)' },
+      { w: 1024, h: 1536, name: 'SDXL / Flux Retrato Vertical (1024x1536)' },
+      { w: 1536, h: 1024, name: 'SDXL / Flux Paisaje Apaisado (1536x1024)' },
+      { w: 1024, h: 1792, name: 'DALL-E 3 Vertical Aspect (1024x1792)' },
+      { w: 1792, h: 1024, name: 'DALL-E 3 Horizontal Widescreen (1792x1024)' },
+      { w: 896, h: 1152, name: 'SDXL Aspect Ratio Preset (896x1152)' },
+      { w: 1152, h: 896, name: 'SDXL Aspect Ratio Preset (1152x896)' },
+      { w: 832, h: 1216, name: 'SDXL Latent Grid (832x1216)' },
+      { w: 1216, h: 832, name: 'SDXL Latent Grid (1216x832)' },
+      { w: 1344, h: 768, name: 'SDXL Cinematic Wide (1344x768)' },
+      { w: 768, h: 1344, name: 'SDXL Cinematic Tall (768x1344)' }
+    ];
+
+    let matchedPreset = aiResolutionPresets.find(p => p.w === width && p.h === height);
+
+    // Escaneo de Marcadores de Cuantización DQT (0xFF 0xDB)
+    let dqtCount = 0;
+    let dqtTables = [];
+    if (magicInfo.detectedFormat === 'JPEG') {
+      let offset = 0;
+      while (offset < buffer.length - 68) {
+        if (buffer[offset] === 0xFF && buffer[offset + 1] === 0xDB) {
+          dqtCount++;
+          const len = buffer.readUInt16BE(offset + 2);
+          if (offset + 4 + 64 <= buffer.length) {
+            const tableBytes = buffer.subarray(offset + 4, offset + 4 + 64);
+            dqtTables.push(tableBytes);
+          }
+          offset += 2 + len;
+        } else {
+          offset++;
+        }
+      }
+    }
+
+    // Análisis de uniformidad en tablas DQT
+    let isSyntheticDqt = false;
+    if (dqtTables.length > 0) {
+      const firstTable = dqtTables[0];
+      let sum = 0;
+      for (let i = 0; i < firstTable.length; i++) sum += firstTable[i];
+      const mean = sum / firstTable.length;
+      let variance = 0;
+      for (let i = 0; i < firstTable.length; i++) variance += Math.pow(firstTable[i] - mean, 2);
+      const stdDev = Math.sqrt(variance / firstTable.length);
+      // Las matrices extremadamente planas o con valores fijos son características de exportadores sintéticos/headless
+      if (stdDev < 4.5 && mean > 8) {
+        isSyntheticDqt = true;
+      }
+    }
+
+    const hasCameraMake = !!(rawMetadata.Make || rawMetadata.Model);
+    const isAiDimensionSignature = !!matchedPreset;
+
+    return {
+      width,
+      height,
+      totalPixels: width * height,
+      megapixels: Number(((width * height) / 1000000).toFixed(2)),
+      aspectRatio: Number(ratio.toFixed(3)),
+      aspectRatioLabel,
+      isSquare,
+      isAiDimensionSignature,
+      matchedAiResolution: matchedPreset ? matchedPreset.name : null,
+      dqtCount,
+      isSyntheticDqt,
+      hasCameraMake
+    };
+  }
+
+  /**
    * Reconstruye el Árbol Genealógico y Ciclo de Vida del Archivo (Digital Provenance Timeline)
    * Analiza etiquetas XMP History (xmpMM:History), creadores y modificaciones sucesivas
    */
@@ -325,7 +493,7 @@ class ForensicService {
    * Inferencia Multidimensional Bayesiana y Calibración Analítica Multicapa (AHP)
    * Computa el porcentaje continuo exacto y emite el dictamen predictivo estructurado.
    */
-  static evaluateIntegrity(metadata, magicInfo, filename, binaryFindings, whatsAppInfo = null) {
+  static evaluateIntegrity(metadata, magicInfo, filename, binaryFindings, whatsAppInfo = null, pixelAnalysis = null) {
     const anomalies = [];
     const aiFindings = [];
     const manualFindings = [];
@@ -404,6 +572,28 @@ class ForensicService {
         const desc = `Software registrado corresponde a motor generativo de IA: "${softwareRaw}"`;
         aiFindings.push(desc);
         anomalies.push(`[IA] ${desc}`);
+      }
+    }
+
+    // Inspección en Dominio de Píxeles & Retícula de Difusión Latente
+    if (pixelAnalysis) {
+      if (pixelAnalysis.isAiDimensionSignature) {
+        v1_aiRaw += 88.0;
+        const desc = `Huella Dimensional de IA Generativa: Resolución nativa (${pixelAnalysis.width}x${pixelAnalysis.height} px) coincide con estándar canónico de difusión: ${pixelAnalysis.matchedAiResolution}`;
+        aiFindings.push(desc);
+        anomalies.push(`[IA VISUAL] ${desc}`);
+        detectedAiModels.push(pixelAnalysis.matchedAiResolution);
+      } else if (pixelAnalysis.isSquare && !metadata.Make) {
+        v1_aiRaw += 78.0;
+        const desc = `Relación de Aspecto Cuadrada 1:1 (${pixelAnalysis.width}x${pixelAnalysis.height} px) sin metadatos de sensor de cámara (Make/Model). Huella típica de generación por difusión artificial (Midjourney / DALL-E / SDXL)`;
+        aiFindings.push(desc);
+        anomalies.push(`[IA VISUAL] ${desc}`);
+        detectedAiModels.push('Generador de Difusión 1:1');
+      }
+
+      if (pixelAnalysis.isSyntheticDqt) {
+        v1_aiRaw += 35.0;
+        anomalies.push(`[TABLA DQT] Estructura de cuantización sintética uniforme detectada en marcadores binarios JPEG.`);
       }
     }
 
@@ -487,9 +677,18 @@ class ForensicService {
         // Crédito positivo de autenticidad óptica
         opticalBonusCredits += 25.0;
       } else if (!hasCameraMake) {
+        const isAiPixelSignature = pixelAnalysis && (pixelAnalysis.isAiDimensionSignature || (pixelAnalysis.isSquare && !hasCameraMake));
         if (whatsAppInfo) {
-          // Tránsito por mensajería: se documenta pero no se penaliza como fraude
-          anomalies.push(`[CANAL DE DISTRIBUCIÓN] Tránsito por WhatsApp detectado (${whatsAppInfo.transitTimestamp}): Metadatos ópticos EXIF y GPS purgados por la plataforma.`);
+          if (isAiPixelSignature) {
+            v1_aiRaw = Math.max(v1_aiRaw, 88.0);
+            v4_opticalRaw += 60.0;
+            const desc = `[IA EN TRÁNSITO POR WHATSAPP] Detección de activo sintético de IA transferido vía WhatsApp (${whatsAppInfo.transitTimestamp}). A pesar de la transcodificación destructiva libjpeg-turbo, la geometría visual (${pixelAnalysis.width}x${pixelAnalysis.height} px, aspecto ${pixelAnalysis.aspectRatioLabel}) y ausencia de sensor óptico ratifican origen en modelo generativo.`;
+            aiFindings.push(desc);
+            anomalies.push(desc);
+          } else {
+            // Tránsito por mensajería de fotografía orgánica: se documenta pero no se penaliza como fraude
+            anomalies.push(`[CANAL DE DISTRIBUCIÓN] Tránsito por WhatsApp detectado (${whatsAppInfo.transitTimestamp}): Metadatos ópticos EXIF y GPS purgados por la plataforma.`);
+          }
         } else {
           v4_opticalRaw += 45.0;
           const desc = 'Supresión de Procedencia Óptica (Metadata Stripping): Ausencia total de fabricante, modelo de cámara, ISO o apertura. Típico de modelos generativos o capturas exportadas';
@@ -512,11 +711,12 @@ class ForensicService {
     const W4 = 0.12; // Procedencia Óptica
     const W5 = 0.08; // Modulación Social
 
+    const isAiPixelSignature = pixelAnalysis && (pixelAnalysis.isAiDimensionSignature || (pixelAnalysis.isSquare && !hasCameraMake));
     const v1_capped = Math.min(100.0, v1_aiRaw);
     const v2_capped = Math.min(100.0, v2_manualRaw);
     const v3_capped = Math.min(100.0, v3_binaryRaw);
     const v4_capped = Math.min(100.0, v4_opticalRaw);
-    const v5_social = whatsAppInfo ? 15.0 : 0.0;
+    const v5_social = (whatsAppInfo && !isAiPixelSignature) ? 15.0 : 0.0;
 
     let aggregateRawScore = 
       (v1_capped * W1) + 
@@ -644,8 +844,9 @@ class ForensicService {
     const rawMetadata = await this.extractMetadata(buffer);
     const binaryFindings = this.scanBinaryForAIFingerprints(buffer);
     const whatsAppInfo = this.detectWhatsAppTransit(originalname, buffer);
+    const pixelAnalysis = this.analyzePixelAndVisualDomain(buffer, rawMetadata, magicInfo);
     let timeline = this.buildProvenanceTimeline(rawMetadata, originalname, analyzedAt, whatsAppInfo);
-    let evaluation = this.evaluateIntegrity(rawMetadata, magicInfo, originalname, binaryFindings, whatsAppInfo);
+    let evaluation = this.evaluateIntegrity(rawMetadata, magicInfo, originalname, binaryFindings, whatsAppInfo, pixelAnalysis);
 
     // Módulo especializado: Análisis Forense Profundo para Documentos PDF
     let pdfForensicReport = null;
@@ -709,8 +910,9 @@ class ForensicService {
       software: pdfForensicReport ? pdfForensicReport.pdfMetadata.producer : (rawMetadata.Software || rawMetadata.CreatorTool || rawMetadata.ProcessingSoftware || 'Sin software registrado'),
       dateTimeOriginal: pdfForensicReport ? pdfForensicReport.pdfMetadata.creationDate : (rawMetadata.DateTimeOriginal ? new Date(rawMetadata.DateTimeOriginal).toISOString() : 'No disponible (Stripped)'),
       modifyDate: pdfForensicReport ? pdfForensicReport.pdfMetadata.modDate : (rawMetadata.ModifyDate ? new Date(rawMetadata.ModifyDate).toISOString() : 'No disponible'),
-      imageWidth: rawMetadata.ImageWidth || rawMetadata.ExifImageWidth || 'N/A',
-      imageHeight: rawMetadata.ImageHeight || rawMetadata.ExifImageHeight || 'N/A',
+      imageWidth: pixelAnalysis ? pixelAnalysis.width : (rawMetadata.ImageWidth || rawMetadata.ExifImageWidth || 'N/A'),
+      imageHeight: pixelAnalysis ? pixelAnalysis.height : (rawMetadata.ImageHeight || rawMetadata.ExifImageHeight || 'N/A'),
+      aspectRatio: pixelAnalysis ? `${pixelAnalysis.aspectRatio} (${pixelAnalysis.aspectRatioLabel})` : 'N/A',
       colorSpace: rawMetadata.ColorSpace ? (rawMetadata.ColorSpace === 1 ? 'sRGB' : 'Uncalibrated') : 'sRGB / Default',
       iso: rawMetadata.ISO || 'N/A',
       exposureTime: rawMetadata.ExposureTime ? `1/${Math.round(1 / rawMetadata.ExposureTime)}s` : 'N/A',
@@ -734,6 +936,7 @@ class ForensicService {
       magicInfo,
       metadata: formattedMetadata,
       binaryFindings,
+      pixelAnalysis,
       timeline,
       riskScore: evaluation.riskScore,
       verdict: evaluation.verdict,

@@ -56,35 +56,31 @@ router.post('/analyze-file', memoryProtectionGuard, upload.single('file'), async
 
     const exifLat = analysisResult.metadata.gpsLatitude ? parseFloat(analysisResult.metadata.gpsLatitude) : null;
     const exifLon = analysisResult.metadata.gpsLongitude ? parseFloat(analysisResult.metadata.gpsLongitude) : null;
+    const hasPhotoGps = !!(exifLat && exifLon);
+    const hasUploaderGps = !!(liveGps && liveGps.latitude && liveGps.longitude);
 
     let geoComparison = {
-      hasGpsData: false,
-      liveGps: liveGps ? {
+      hasGpsData: hasPhotoGps, // Verdadero solo si el archivo fotográfico contiene coordenadas ópticas nativas
+      hasPhotoGps,
+      hasUploaderGps,
+      photoGps: hasPhotoGps ? {
+        latitude: exifLat,
+        longitude: exifLon,
+        dms: `${formatDms(exifLat, true)}, ${formatDms(exifLon, false)}`
+      } : null,
+      uploaderGps: hasUploaderGps ? {
         latitude: liveGps.latitude,
         longitude: liveGps.longitude,
         dms: `${formatDms(liveGps.latitude, true)}, ${formatDms(liveGps.longitude, false)}`,
         accuracyMeters: liveGps.accuracy || 10,
         altitudeMeters: liveGps.altitude || null
       } : null,
-      exifGps: (exifLat && exifLon) ? {
-        latitude: exifLat,
-        longitude: exifLon,
-        dms: `${formatDms(exifLat, true)}, ${formatDms(exifLon, false)}`
-      } : null,
       discrepancyKm: null,
       isGpsSpoofed: false,
-      mapUrl: null
+      mapUrl: hasPhotoGps ? `https://www.openstreetmap.org/?mlat=${exifLat}&mlon=${exifLon}#map=16/${exifLat}/${exifLon}` : null
     };
 
-    const effectiveLat = exifLat || (liveGps ? liveGps.latitude : null);
-    const effectiveLon = exifLon || (liveGps ? liveGps.longitude : null);
-
-    if (effectiveLat && effectiveLon) {
-      geoComparison.hasGpsData = true;
-      geoComparison.mapUrl = `https://www.openstreetmap.org/?mlat=${effectiveLat}&mlon=${effectiveLon}#map=16/${effectiveLat}/${effectiveLon}`;
-    }
-
-    if (liveGps && exifLat && exifLon) {
+    if (hasUploaderGps && hasPhotoGps) {
       const distanceKm = calculateHaversineDistanceKm(liveGps.latitude, liveGps.longitude, exifLat, exifLon);
       geoComparison.discrepancyKm = distanceKm.toFixed(2);
 
@@ -356,11 +352,20 @@ router.post('/field-upload', memoryProtectionGuard, upload.single('file'), async
     // 2. Correlación Pericial de Geolocalización
     const exifLat = analysisResult.metadata.gpsLatitude ? parseFloat(analysisResult.metadata.gpsLatitude) : null;
     const exifLon = analysisResult.metadata.gpsLongitude ? parseFloat(analysisResult.metadata.gpsLongitude) : null;
+    const hasPhotoGps = !!(exifLat && exifLon);
+    const hasUploaderGps = !!(liveGps && liveGps.latitude && liveGps.longitude);
 
     let geoComparison = {
-      hasGpsData: false,
+      hasGpsData: hasPhotoGps, // Verdadero solo si el archivo fotográfico contiene coordenadas ópticas nativas
+      hasPhotoGps,
+      hasUploaderGps,
       operationalZone,
-      liveGps: liveGps ? {
+      photoGps: hasPhotoGps ? {
+        latitude: exifLat,
+        longitude: exifLon,
+        dms: `${formatDms(exifLat, true)}, ${formatDms(exifLon, false)}`
+      } : null,
+      uploaderGps: hasUploaderGps ? {
         latitude: liveGps.latitude,
         longitude: liveGps.longitude,
         dms: `${formatDms(liveGps.latitude, true)}, ${formatDms(liveGps.longitude, false)}`,
@@ -372,28 +377,15 @@ router.post('/field-upload', memoryProtectionGuard, upload.single('file'), async
         longitude: declaredGps.longitude,
         dms: `${formatDms(declaredGps.latitude, true)}, ${formatDms(declaredGps.longitude, false)}`
       } : null,
-      exifGps: (exifLat && exifLon) ? {
-        latitude: exifLat,
-        longitude: exifLon,
-        dms: `${formatDms(exifLat, true)}, ${formatDms(exifLon, false)}`
-      } : null,
       discrepancyKm: null,
       isGpsSpoofed: false,
-      mapUrl: null
+      mapUrl: hasPhotoGps ? `https://www.openstreetmap.org/?mlat=${exifLat}&mlon=${exifLon}#map=16/${exifLat}/${exifLon}` : null
     };
-
-    const effectiveLat = exifLat || (liveGps ? liveGps.latitude : (declaredGps ? declaredGps.latitude : null));
-    const effectiveLon = exifLon || (liveGps ? liveGps.longitude : (declaredGps ? declaredGps.longitude : null));
-
-    if (effectiveLat && effectiveLon) {
-      geoComparison.hasGpsData = true;
-      geoComparison.mapUrl = `https://www.openstreetmap.org/?mlat=${effectiveLat}&mlon=${effectiveLon}#map=16/${effectiveLat}/${effectiveLon}`;
-    }
 
     const deviceLat = liveGps ? liveGps.latitude : (declaredGps ? declaredGps.latitude : null);
     const deviceLon = liveGps ? liveGps.longitude : (declaredGps ? declaredGps.longitude : null);
 
-    if (deviceLat && deviceLon && exifLat && exifLon) {
+    if (deviceLat && deviceLon && hasPhotoGps) {
       const distanceKm = calculateHaversineDistanceKm(deviceLat, deviceLon, exifLat, exifLon);
       geoComparison.discrepancyKm = distanceKm.toFixed(2);
 

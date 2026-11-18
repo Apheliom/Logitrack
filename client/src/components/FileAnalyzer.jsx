@@ -10,6 +10,7 @@ import { CustodyHashCard } from './common/CustodyHashCard';
 import { ProvenanceTimeline } from './common/ProvenanceTimeline';
 import ThreatRadarDeck from './common/ThreatRadarDeck';
 import ForensicGeoMap from './common/ForensicGeoMap';
+import PixelForensicViewer from './common/PixelForensicViewer';
 import { humanizeForensicText, humanizeForensicDate, humanizeTechnicalParam } from '../utils/forensicFormatter';
 
 export default function FileAnalyzer() {
@@ -544,12 +545,27 @@ export default function FileAnalyzer() {
                 </div>
               )}
 
+              {/* Visor Forense de Píxeles & ELA (Error Level Analysis) */}
+              {(previewUrl || fileAnalysisResult.pixelAnalysis) && (
+                <PixelForensicViewer
+                  imageUrl={previewUrl}
+                  pixelAnalysis={fileAnalysisResult.pixelAnalysis}
+                  metadata={fileAnalysisResult.metadata}
+                />
+              )}
+
               {/* Geolocalización Pericial & Telemetría Satelital */}
               <ForensicGeoMap 
                 geoData={
                   fileAnalysisResult.geoComparison || 
                   (fileAnalysisResult.metadata?.gpsLatitude ? {
                     hasGpsData: true,
+                    hasPhotoGps: true,
+                    photoGps: {
+                      latitude: parseFloat(fileAnalysisResult.metadata.gpsLatitude),
+                      longitude: parseFloat(fileAnalysisResult.metadata.gpsLongitude),
+                      dms: `${fileAnalysisResult.metadata.gpsLatitude}, ${fileAnalysisResult.metadata.gpsLongitude}`
+                    },
                     exifGps: {
                       latitude: parseFloat(fileAnalysisResult.metadata.gpsLatitude),
                       longitude: parseFloat(fileAnalysisResult.metadata.gpsLongitude),
