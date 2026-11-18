@@ -335,9 +335,9 @@ class ForensicService {
 
   /**
    * Análisis Forense en el Dominio Visual y de Píxeles
-   * Identifica huellas de difusión latente, resolución canónica de IA, aspecto 1:1 y tablas DQT
+   * Identifica huellas de difusión latente, resolución canónica de IA, aspecto 1:1, tablas DQT y capturas de pantalla
    */
-  static analyzePixelAndVisualDomain(buffer, rawMetadata = {}, magicInfo = {}) {
+  static analyzePixelAndVisualDomain(buffer, rawMetadata = {}, magicInfo = {}, whatsAppInfo = null, filename = '') {
     const isImage = magicInfo.detectedFormat === 'JPEG' || magicInfo.detectedFormat === 'PNG' || magicInfo.detectedFormat === 'WEBP' || (magicInfo.category === 'IMAGE');
     if (!isImage || !buffer) {
       return null;
@@ -381,6 +381,24 @@ class ForensicService {
 
     let matchedPreset = aiResolutionPresets.find(p => p.w === width && p.h === height);
 
+    // Detección rigurosa de Capturas de Pantalla (Screenshots de Dispositivos Móviles y PC)
+    const isTallScreenRatio = (ratio >= 0.40 && ratio <= 0.58) || (ratio >= 1.70 && ratio <= 2.45);
+    const hasScreenshotKeyword = /screenshot|captura|screen_shot|screen shot|screencap/i.test(filename || '');
+    const standardScreenResolutions = [
+      '1080x2400', '1080x2340', '1080x2280', '1080x1920',
+      '720x1600', '720x1560', '720x1520', '720x1280',
+      '1170x2532', '1179x2556', '1290x2796', '1284x2778',
+      '1440x3200', '1440x3088', '1440x3120', '1440x2560',
+      '2400x1080', '2340x1080', '1920x1080', '1600x720',
+      '2532x1170', '2556x1179', '2796x1290', '2778x1284'
+    ];
+    const isStandardScreenRes = standardScreenResolutions.includes(`${width}x${height}`);
+    const isDeviceScreenshot = (isTallScreenRatio && !isSquare && !matchedPreset) || hasScreenshotKeyword || isStandardScreenRes;
+
+    if (isDeviceScreenshot && isTallScreenRatio) {
+      aspectRatioLabel = ratio < 1.0 ? 'Pantalla Móvil Vertical (Screenshot)' : 'Pantalla Panorámica (Screenshot)';
+    }
+
     // Escaneo de Marcadores de Cuantización DQT (0xFF 0xDB)
     let dqtCount = 0;
     let dqtTables = [];
@@ -403,6 +421,7 @@ class ForensicService {
 
     // Análisis de uniformidad y origen en tablas DQT
     let isSyntheticDqt = false;
+    let isWhatsAppDqt = false;
     if (dqtTables.length > 0) {
       const firstTable = dqtTables[0];
       let sum = 0;
@@ -411,9 +430,16 @@ class ForensicService {
       let variance = 0;
       for (let i = 0; i < firstTable.length; i++) variance += Math.pow(firstTable[i] - mean, 2);
       const stdDev = Math.sqrt(variance / firstTable.length);
-      // Las matrices extremadamente planas, con valores uniformes o con 1 sola tabla en JPEG son de renderizadores sintéticos
-      if ((stdDev < 6.8 && mean > 5) || dqtTables.length === 1) {
-        isSyntheticDqt = true;
+
+      // Si el archivo transitó por WhatsApp, la tabla DQT proviene del códec libjpeg-turbo de Meta
+      if (whatsAppInfo) {
+        isWhatsAppDqt = true;
+        isSyntheticDqt = false; // NO se imputa como IA ya que es el códec nativo de red social
+      } else if (!isDeviceScreenshot) {
+        // Fuera de redes sociales y en imágenes que no son capturas de pantalla:
+        if ((stdDev < 6.8 && mean > 5) || dqtTables.length === 1) {
+          isSyntheticDqt = true;
+        }
       }
     }
 
@@ -432,6 +458,8 @@ class ForensicService {
       matchedAiResolution: matchedPreset ? matchedPreset.name : null,
       dqtCount,
       isSyntheticDqt,
+      isWhatsAppDqt,
+      isDeviceScreenshot,
       hasCameraMake
     };
   }
@@ -628,7 +656,7 @@ class ForensicService {
         detectedAiModels.push('Generador de Difusión 1:1');
       }
 
-      if (pixelAnalysis.isSyntheticDqt) {
+      if (pixelAnalysis.isSyntheticDqt && !pixelAnalysis.isWhatsAppDqt) {
         v1_aiRaw += 86.0;
         const desc = `Tabla de Cuantización Sintética (DQT): Estructura de compresión artificial no analógica. No generada por sensor físico, característica de renderizadores de IA o pipelines headless`;
         aiFindings.push(desc);
@@ -640,6 +668,10 @@ class ForensicService {
           manualFindings.push(hybridDesc);
           anomalies.push(`[MANIPULACIÓN HÍBRIDA] ${hybridDesc}`);
         }
+      }
+
+      if (pixelAnalysis.isDeviceScreenshot) {
+        anomalies.push(`[CAPTURA DE PANTALLA] Formato correspondiente a volcado de pantalla de dispositivo móvil o monitor (${pixelAnalysis.width}x${pixelAnalysis.height} px, aspecto ${pixelAnalysis.aspectRatioLabel}).`);
       }
     }
 
@@ -723,23 +755,28 @@ class ForensicService {
         // Crédito positivo de autenticidad óptica
         opticalBonusCredits += 25.0;
       } else if (!hasCameraMake) {
-        const isAiPixelSignature = pixelAnalysis && (pixelAnalysis.isAiDimensionSignature || (pixelAnalysis.isSquare && !hasCameraMake));
-        if (whatsAppInfo) {
-          if (isAiPixelSignature) {
-            v1_aiRaw = Math.max(v1_aiRaw, 88.0);
-            v4_opticalRaw += 60.0;
-            const desc = `[IA EN TRÁNSITO POR WHATSAPP] Detección de activo sintético de IA transferido vía WhatsApp (${whatsAppInfo.transitTimestamp}). A pesar de la transcodificación destructiva libjpeg-turbo, la geometría visual (${pixelAnalysis.width}x${pixelAnalysis.height} px, aspecto ${pixelAnalysis.aspectRatioLabel}) y ausencia de sensor óptico ratifican origen en modelo generativo.`;
-            aiFindings.push(desc);
-            anomalies.push(desc);
-          } else {
-            // Tránsito por mensajería de fotografía orgánica: se documenta pero no se penaliza como fraude
-            anomalies.push(`[CANAL DE DISTRIBUCIÓN] Tránsito por WhatsApp detectado (${whatsAppInfo.transitTimestamp}): Metadatos ópticos EXIF y GPS purgados por la plataforma.`);
-          }
+        if (pixelAnalysis?.isDeviceScreenshot) {
+          // Captura de pantalla legítima: carece de sensor óptico por definición de framebuffer
+          v4_opticalRaw = 0;
         } else {
-          v4_opticalRaw += 45.0;
-          const desc = 'Supresión de Procedencia Óptica (Metadata Stripping): Ausencia total de fabricante, modelo de cámara, ISO o apertura. Típico de modelos generativos o capturas exportadas';
-          aiFindings.push(desc);
-          anomalies.push(`[IA] ${desc}`);
+          const isAiPixelSignature = pixelAnalysis && (pixelAnalysis.isAiDimensionSignature || (pixelAnalysis.isSquare && !hasCameraMake));
+          if (whatsAppInfo) {
+            if (isAiPixelSignature) {
+              v1_aiRaw = Math.max(v1_aiRaw, 88.0);
+              v4_opticalRaw += 60.0;
+              const desc = `[IA EN TRÁNSITO POR WHATSAPP] Detección de activo sintético de IA transferido vía WhatsApp (${whatsAppInfo.transitTimestamp}). A pesar de la transcodificación destructiva libjpeg-turbo, la geometría visual (${pixelAnalysis.width}x${pixelAnalysis.height} px, aspecto ${pixelAnalysis.aspectRatioLabel}) y ausencia de sensor óptico ratifican origen en modelo generativo.`;
+              aiFindings.push(desc);
+              anomalies.push(desc);
+            } else {
+              // Tránsito por mensajería de fotografía orgánica: se documenta pero no se penaliza como fraude
+              anomalies.push(`[CANAL DE DISTRIBUCIÓN] Tránsito por WhatsApp detectado (${whatsAppInfo.transitTimestamp}): Metadatos ópticos EXIF y GPS purgados por la plataforma.`);
+            }
+          } else {
+            v4_opticalRaw += 45.0;
+            const desc = 'Supresión de Procedencia Óptica (Metadata Stripping): Ausencia total de fabricante, modelo de cámara, ISO o apertura. Típico de modelos generativos o capturas exportadas';
+            aiFindings.push(desc);
+            anomalies.push(`[IA] ${desc}`);
+          }
         }
       }
     }
@@ -757,7 +794,7 @@ class ForensicService {
     const W4 = 0.12; // Procedencia Óptica
     const W5 = 0.08; // Modulación Social
 
-    const isAiPixelSignature = pixelAnalysis && (pixelAnalysis.isAiDimensionSignature || (pixelAnalysis.isSquare && !hasCameraMake) || pixelAnalysis.isSyntheticDqt);
+    const isAiPixelSignature = pixelAnalysis && (pixelAnalysis.isAiDimensionSignature || (pixelAnalysis.isSquare && !hasCameraMake) || (pixelAnalysis.isSyntheticDqt && !pixelAnalysis.isWhatsAppDqt));
     const v1_capped = Math.min(100.0, v1_aiRaw);
     const v2_capped = Math.min(100.0, v2_manualRaw);
     const v3_capped = Math.min(100.0, v3_binaryRaw);
@@ -838,11 +875,21 @@ class ForensicService {
         'Efectuar análisis complementario de Nivel de Error (ELA) en bordes de contraste.',
         'Inspeccionar el árbol genealógico de capas XMP.'
       ];
+    } else if (pixelAnalysis?.isDeviceScreenshot) {
+      predictiveCategory = 'CAPTURADEPANTALLA_DISPOSITIVO';
+      certaintyPercentage = 98.4;
+      confidenceLevel = 'EXTREMA';
+      forensicHypothesis = `Activo digital correspondiente a una captura de pantalla legítima (Framebuffer) de terminal móvil o monitor (${pixelAnalysis.width}x${pixelAnalysis.height} px, aspecto ${pixelAnalysis.aspectRatioLabel}). La ausencia de metadatos de sensor óptico es consistente y propia de grabaciones de pantalla, sin trazas de síntesis por IA.`;
+      expertRecommendations = [
+        'Admitir como captura de pantalla válida en la cadena de custodia.',
+        'Correlacionar la estampa temporal con los registros de actividad del terminal emisor.',
+        'Fijar el hash SHA-256 en el expediente pericial.'
+      ];
     } else if (whatsAppInfo) {
       predictiveCategory = 'TRANSITO_RED_SOCIAL_SANITIZADO';
       certaintyPercentage = 93.4;
       confidenceLevel = 'ALTA';
-      forensicHypothesis = `Activo de origen orgánico degradado por el canal de mensajería WhatsApp (${whatsAppInfo.transitTimestamp}). La pérdida de EXIF/GPS se atribuye con certeza del 93.4% a la transcodificación estándar de la app, sin evidencias de síntesis generativa.`;
+      forensicHypothesis = `Activo de origen orgánico degradado por el canal de mensajería WhatsApp (${whatsAppInfo.transitTimestamp}). La pérdida de EXIF/GPS y la presencia del códec libjpeg-turbo se atribuyen con certeza del 93.4% a la transcodificación estándar de la app, sin evidencias de síntesis generativa.`;
       expertRecommendations = [
         'Para validez probatoria con GPS completo, solicitar retransmisión como "Documento".',
         'Conservar el timestamp y secuencial WA como indicio temporal de custodia.',
@@ -907,7 +954,7 @@ class ForensicService {
     const rawMetadata = await this.extractMetadata(buffer);
     const binaryFindings = this.scanBinaryForAIFingerprints(buffer);
     const whatsAppInfo = this.detectWhatsAppTransit(originalname, buffer);
-    const pixelAnalysis = this.analyzePixelAndVisualDomain(buffer, rawMetadata, magicInfo);
+    const pixelAnalysis = this.analyzePixelAndVisualDomain(buffer, rawMetadata, magicInfo, whatsAppInfo, originalname);
     let timeline = this.buildProvenanceTimeline(rawMetadata, originalname, analyzedAt, whatsAppInfo);
     let evaluation = this.evaluateIntegrity(rawMetadata, magicInfo, originalname, binaryFindings, whatsAppInfo, pixelAnalysis);
 

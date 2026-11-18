@@ -70,7 +70,26 @@ SecuriTrace es una plataforma de análisis forense digital multimedia, verificac
     2. `uploaderGps`: Telemetría del navegador/terminal del auditor en el instante de la ingesta pericial, rotulada explícitamente como *"Punto de Ingesta Pericial (Ubicación del Auditor)"*.
   - El cálculo de discrepancia espacial y alerta de spoofing se ejecuta única y exclusivamente cuando ambos puntos (`photoGps` y `uploaderGps`) coexisten simultáneamente.
 
-## Detección de Manipulación Híbrida (Foto Real Modificada con IA / Inpainting)
+## Discriminación Forense Robusta: Mensajería (WhatsApp), Capturas de Pantalla e IA Real
+- **Diagnóstico del Falso Positivo en Capturas y Fotos Reenviadas:**
+  - Al recibir una fotografía o captura de pantalla desde otro dispositivo vía WhatsApp, la plataforma aplica su propio transcodificador `libjpeg-turbo`.
+  - El motor anterior interpretaba erróneamente la tabla DQT de `libjpeg-turbo` como "Cuantización Sintética de IA" (`isSyntheticDqt = true`), asignando de inmediato $+86\%$ de riesgo de IA a capturas de pantalla legítimas y fotos orgánicas reenviadas.
+- **Modelo de Clasificación Forense Multinivel:**
+  1. **Aislamiento de la Firma DQT de WhatsApp:**
+     - Si `whatsAppInfo` está presente, la tabla DQT de `libjpeg-turbo` se clasifica como *artefacto estándar del protocolo de transporte*, NO como evidencia de IA generativa.
+  2. **Discriminador de Capturas de Pantalla (`isDeviceScreenshot`):**
+     - Detecta resoluciones y relaciones de aspecto de pantallas móviles (9:16, 9:18, 9:19, 9:19.5, 9:20, 9:21; ej. 1080x2400, 1080x2340, 720x1600, 1170x2532, 1179x2556) o nomenclatura `Screenshot/Captura`.
+     - Se clasifica como `CAPTURADEPANTALLA_DISPOSITIVO` con riesgo $\le 3\%$ (Autenticidad $\ge 97\%$), incluso si transitó por WhatsApp.
+  3. **Fotos Orgánicas Reenviadas por WhatsApp:**
+     - Tienen proporciones de sensor óptico (4:3, 16:9, 3:2; ej. 1600x1200, 1280x960). No son cuadradas 1:1 ni coinciden con resoluciones canónicas de difusión.
+     - Se clasifican como `TRANSITO_RED_SOCIAL_SANITIZADO` con riesgo $\le 2\%$ (Autenticidad $\ge 98\%$).
+  4. **Imágenes de IA en Tránsito por WhatsApp (Verdaderos Positivos):**
+     - Poseen relación cuadrada 1:1 ($1024\times 1024$, $2048\times 2048$, $512\times 512$) o retículas canónicas de difusión ($1024\times 1536$, $1024\times 1792$, $896\times 1152$), carecen de sensor de cámara y contienen marcadores generativos o de inpainting.
+     - Se clasifican como `SINTETICO_IA_GENERATIVA` con riesgo $\ge 95\%$.
+  5. **Fotos Reales Manipuladas con IA (Inpainting / Face Swap):**
+     - Contienen metadatos de cámara física (`Make/Model`) pero presentan firmas de Adobe Firefly (`generative_fill`), difusión (`inpaint`, `latent_mask`), Face Swap o tablas DQT sintéticas fuera de WhatsApp.
+     - Se clasifican como `FOTO_REAL_MANIPULADA_CON_IA` con riesgo $\ge 96\%$.
+
 - **Causa Raíz del 86.6% de Autenticidad y Vector IA al 35%:**
   - Cuando una imagen partía de una foto real pero era manipulada con IA (Inpainting, Generative Fill, Face Swap), `pixelAnalysis.isSyntheticDqt` asignaba únicamente `v1_aiRaw += 35.0`.
   - La ponderación lineal bayesiana ($W_1 = 0.35$) multiplicaba $35.0 \times 0.35 = 12.25\%$.
