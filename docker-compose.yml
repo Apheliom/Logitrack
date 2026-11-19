@@ -1,0 +1,50 @@
+version: '3.8'
+
+services:
+  # Base de Datos Local PostgreSQL (Opcional: Si no usas Supabase Cloud)
+  postgres_db:
+    image: postgres:15-alpine
+    container_name: logitrack_postgres
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgrespassword
+      POSTGRES_DB: logitrack
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./server/schema.sql:/docker-entrypoint-initdb.d/schema.sql
+
+  # Backend Node.js API + WebSockets
+  backend_api:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    container_name: logitrack_backend
+    restart: always
+    ports:
+      - "4000:4000"
+    environment:
+      PORT: 4000
+      NODE_ENV: production
+      DATABASE_URL: postgresql://postgres:postgrespassword@postgres_db:5432/logitrack
+      JWT_SECRET: logitrack_super_secure_jwt_secret_key_2026_systems_eng
+      CLIENT_ORIGIN: "*"
+    depends_on:
+      - postgres_db
+
+  # Frontend React SPA + Nginx
+  frontend_web:
+    build:
+      context: ./client
+      dockerfile: Dockerfile
+    container_name: logitrack_frontend
+    restart: always
+    ports:
+      - "80:80"
+    depends_on:
+      - backend_api
+
+volumes:
+  postgres_data:
