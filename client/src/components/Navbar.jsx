@@ -3,7 +3,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useSocket } from '../context/SocketContext';
 import { LogiTrackLogo } from './Brand/LogiTrackLogo';
-import { LogOut, Radio, Package, Navigation, LayoutDashboard, ShoppingBag } from 'lucide-react';
+import { LogOut, Radio, Package, Navigation, LayoutDashboard, ShoppingBag, BarChart3, ClipboardList } from 'lucide-react';
 
 export const Navbar = () => {
   const { user, logout } = useAuth();
@@ -19,7 +19,7 @@ export const Navbar = () => {
       to={to}
       className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
         isActive(to)
-          ? 'bg-blue-50 text-blue-700 shadow-sm'
+          ? 'bg-blue-50 text-blue-700 shadow-xs'
           : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/70'
       }`}
     >
@@ -29,24 +29,39 @@ export const Navbar = () => {
   );
 
   return (
-    <header className="bg-white/90 backdrop-blur-md border-b border-slate-200/80 sticky top-0 z-50 h-16 shadow-xs">
+    <header className="bg-white/95 backdrop-blur-md border-b border-slate-200 sticky top-0 z-50 h-16 shadow-2xs">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 h-full flex items-center justify-between gap-4">
 
         {/* Brand Logo */}
-        <Link to={user.role === 'DRIVER' ? '/driver' : '/admin'} className="hover:opacity-95 transition-opacity">
+        <Link
+          to={user.role === 'ADMIN' ? '/admin' : user.role === 'DRIVER' ? '/driver' : '/store'}
+          className="hover:opacity-95 transition-opacity"
+        >
           <LogiTrackLogo size="md" variant="full" />
         </Link>
 
-        {/* Navigation */}
-        <nav className="hidden md:flex items-center gap-1 bg-slate-50/80 p-1 border border-slate-200/60 rounded-xl">
+        {/* Navigation segregada estrictamente por rol */}
+        <nav className="hidden md:flex items-center gap-1 bg-slate-50/80 p-1 border border-slate-200/80 rounded-xl">
+          {/* Vistas solo para ADMIN */}
           {user.role === 'ADMIN' && (
-            <NavLink to="/admin" icon={LayoutDashboard} label="Panel de Control" />
+            <>
+              <NavLink to="/admin" icon={LayoutDashboard} label="Panel & Mapa" />
+              <NavLink to="/admin/analytics" icon={BarChart3} label="Estadísticas & Bitácora" />
+            </>
           )}
-          {(user.role === 'ADMIN' || user.role === 'DRIVER') && (
-            <NavLink to="/driver" icon={Navigation} label="Ruta Repartidor" />
+
+          {/* Vistas solo para DRIVER */}
+          {user.role === 'DRIVER' && (
+            <NavLink to="/driver" icon={Navigation} label="Terminal de Rutas" />
           )}
-          <NavLink to="/store" icon={ShoppingBag} label="Tienda Express" />
-          <NavLink to="/track/TRK-2026-001" icon={Package} label="Rastreo Cliente" />
+
+          {/* Vistas solo para CLIENTE */}
+          {user.role === 'CLIENT' && (
+            <>
+              <NavLink to="/store" icon={ShoppingBag} label="Catálogo Express" />
+              <NavLink to="/client/my-orders" icon={ClipboardList} label="Mis Compras" />
+            </>
+          )}
         </nav>
 
         {/* Right side status and profile */}

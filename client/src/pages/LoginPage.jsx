@@ -19,9 +19,13 @@ export const LoginPage = () => {
     setLoading(true);
     try {
       const user = await login(resolvedEmail, resolvedPass);
-      if (user.role === 'ADMIN')  navigate('/admin');
-      else if (user.role === 'DRIVER') navigate('/driver');
-      else navigate('/track/TRK-2026-001');
+      if (user.role === 'ADMIN') {
+        navigate('/admin');
+      } else if (user.role === 'DRIVER') {
+        navigate('/driver');
+      } else {
+        navigate('/store'); // Cliente va directo a la tienda
+      }
     } catch (err) {
       setError(err.message || 'Credenciales incorrectas.');
     } finally {
@@ -138,36 +142,51 @@ export const LoginPage = () => {
           {/* Quick access */}
           <div className="space-y-2.5">
             <div className="flex items-center gap-3">
-              <div className="flex-1 h-px bg-surface-3" />
-              <span className="text-xs text-ink-disabled font-medium">Acceso rápido (demo)</span>
-              <div className="flex-1 h-px bg-surface-3" />
+              <div className="flex-1 h-px bg-slate-200" />
+              <span className="text-xs text-slate-500 font-semibold uppercase tracking-wider">
+                Accesos de Demostración
+              </span>
+              <div className="flex-1 h-px bg-slate-200" />
             </div>
 
-            <div className="grid grid-cols-2 gap-2.5">
+            <div className="grid grid-cols-3 gap-2">
               <button
                 type="button"
                 onClick={() => handleQuickLogin('admin@logitrack.com', 'Password123!')}
                 disabled={loading}
-                className="p-3 bg-white border border-surface-3 hover:border-brand-300 hover:bg-brand-50 rounded-xl text-left transition-all group disabled:opacity-60"
+                className="p-2.5 bg-slate-50 border border-slate-200 hover:border-blue-300 hover:bg-blue-50/60 rounded-xl text-left transition-all disabled:opacity-60"
               >
                 <div className="flex items-center gap-1.5 mb-0.5">
-                  <Zap className="w-3.5 h-3.5 text-brand-500" strokeWidth={2} />
-                  <span className="text-xs font-semibold text-brand-600">Despachador</span>
+                  <Zap className="w-3.5 h-3.5 text-blue-600 shrink-0" strokeWidth={2.2} />
+                  <span className="text-xs font-bold text-blue-700 truncate">Admin</span>
                 </div>
-                <div className="text-[11px] text-ink-tertiary leading-tight">admin@logitrack.com</div>
+                <div className="text-[10px] text-slate-500 truncate">Despacho</div>
               </button>
 
               <button
                 type="button"
                 onClick={() => handleQuickLogin('driver1@logitrack.com', 'Password123!')}
                 disabled={loading}
-                className="p-3 bg-white border border-surface-3 hover:border-green-300 hover:bg-green-50 rounded-xl text-left transition-all disabled:opacity-60"
+                className="p-2.5 bg-slate-50 border border-slate-200 hover:border-emerald-300 hover:bg-emerald-50/60 rounded-xl text-left transition-all disabled:opacity-60"
               >
                 <div className="flex items-center gap-1.5 mb-0.5">
-                  <Zap className="w-3.5 h-3.5 text-status-success" strokeWidth={2} />
-                  <span className="text-xs font-semibold text-status-success">Repartidor 01</span>
+                  <Zap className="w-3.5 h-3.5 text-emerald-600 shrink-0" strokeWidth={2.2} />
+                  <span className="text-xs font-bold text-emerald-700 truncate">Repartidor</span>
                 </div>
-                <div className="text-[11px] text-ink-tertiary leading-tight">driver1@logitrack.com</div>
+                <div className="text-[10px] text-slate-500 truncate">Ruta Móvil</div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleQuickLogin('cliente@logitrack.com', 'Password123!')}
+                disabled={loading}
+                className="p-2.5 bg-slate-50 border border-slate-200 hover:border-purple-300 hover:bg-purple-50/60 rounded-xl text-left transition-all disabled:opacity-60"
+              >
+                <div className="flex items-center gap-1.5 mb-0.5">
+                  <Zap className="w-3.5 h-3.5 text-purple-600 shrink-0" strokeWidth={2.2} />
+                  <span className="text-xs font-bold text-purple-700 truncate">Cliente</span>
+                </div>
+                <div className="text-[10px] text-slate-500 truncate">Tienda</div>
               </button>
             </div>
           </div>

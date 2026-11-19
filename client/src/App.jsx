@@ -6,9 +6,11 @@ import { Navbar } from './components/Navbar';
 import { LoginPage } from './pages/LoginPage';
 import { RegisterPage } from './pages/RegisterPage';
 import { AdminDashboard } from './pages/AdminDashboard';
+import { AdminAnalyticsPage } from './pages/AdminAnalyticsPage';
 import { DriverView } from './pages/DriverView';
-import { PublicTrackingPage } from './pages/PublicTrackingPage';
 import { CustomerStorePage } from './pages/CustomerStorePage';
+import { ClientOrdersPage } from './pages/ClientOrdersPage';
+import { PublicTrackingPage } from './pages/PublicTrackingPage';
 
 // Componente para Proteger Rutas
 const ProtectedRoute = ({ children, allowedRoles = [] }) => {
@@ -28,7 +30,10 @@ const ProtectedRoute = ({ children, allowedRoles = [] }) => {
   }
 
   if (allowedRoles.length > 0 && !allowedRoles.includes(user.role)) {
-    return <Navigate to={user.role === 'DRIVER' ? '/driver' : '/admin'} replace />;
+    // Redirección inteligente al área propia del rol
+    if (user.role === 'DRIVER') return <Navigate to="/driver" replace />;
+    if (user.role === 'CLIENT') return <Navigate to="/store" replace />;
+    return <Navigate to="/admin" replace />;
   }
 
   return children;
@@ -39,17 +44,37 @@ export function App() {
     <BrowserRouter>
       <AuthProvider>
         <SocketProvider>
-          <div className="min-h-screen bg-slate-50/60 text-slate-900 flex flex-col font-sans antialiased">
+          <div className="min-h-screen bg-slate-100/70 text-slate-900 flex flex-col font-sans antialiased">
             <Navbar />
             <main className="flex-1">
               <Routes>
                 {/* Rutas Públicas */}
                 <Route path="/login" element={<LoginPage />} />
                 <Route path="/register" element={<RegisterPage />} />
-                <Route path="/store" element={<CustomerStorePage />} />
                 <Route path="/track/:trackingNumber?" element={<PublicTrackingPage />} />
 
-                {/* Rutas Protegidas de Despacho (Admin) */}
+                {/* Rutas para Clientes */}
+                <Route path="/store" element={<CustomerStorePage />} />
+                <Route
+                  path="/client/my-orders"
+                  element={
+                    <ProtectedRoute allowedRoles={['CLIENT', 'ADMIN']}>
+                      <ClientOrdersPage />
+                    </ProtectedRoute>
+                  }
+                />
+
+                {/* Rutas para Repartidores */}
+                <Route
+                  path="/driver"
+                  element={
+                    <ProtectedRoute allowedRoles={['ADMIN', 'DRIVER']}>
+                      <DriverView />
+                    </ProtectedRoute>
+                  }
+                />
+
+                {/* Rutas para Administradores / Despacho */}
                 <Route
                   path="/admin"
                   element={
@@ -58,13 +83,11 @@ export function App() {
                     </ProtectedRoute>
                   }
                 />
-
-                {/* Rutas Protegidas de Repartidor (Driver) */}
                 <Route
-                  path="/driver"
+                  path="/admin/analytics"
                   element={
-                    <ProtectedRoute allowedRoles={['ADMIN', 'DRIVER']}>
-                      <DriverView />
+                    <ProtectedRoute allowedRoles={['ADMIN']}>
+                      <AdminAnalyticsPage />
                     </ProtectedRoute>
                   }
                 />
