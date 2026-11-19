@@ -11,7 +11,9 @@ import {
   Radio,
   ExternalLink,
   Phone,
-  ShieldCheck
+  ShieldCheck,
+  RotateCw,
+  Send
 } from 'lucide-react';
 
 export const DriverView = () => {
@@ -52,7 +54,7 @@ export const DriverView = () => {
         setWatchId(null);
       }
       setGpsActive(false);
-      setStatusMessage('Transmisión GPS pausada.');
+      setStatusMessage('Transmisión de ubicación en pausa.');
     } else {
       if (!navigator.geolocation) {
         alert('Tu navegador no soporta geolocalización.');
@@ -82,14 +84,14 @@ export const DriverView = () => {
         },
         (error) => {
           console.warn('Error GPS:', error.message);
-          setStatusMessage('Aviso GPS: Usando simulación de coordenadas.');
+          setStatusMessage('Aviso: Utilizando ubicación predeterminada.');
         },
         { enableHighAccuracy: true, maximumAge: 5000, timeout: 10000 }
       );
 
       setWatchId(id);
       setGpsActive(true);
-      setStatusMessage('🛰️ Transmitiendo coordenadas GPS en vivo.');
+      setStatusMessage('Transmitiendo telemetría GPS en tiempo real.');
     }
   };
 
@@ -133,99 +135,112 @@ export const DriverView = () => {
   };
 
   return (
-    <div className="max-w-2xl mx-auto px-4 py-6 space-y-5">
-      
-      {/* Driver Header Card */}
-      <div className="bg-slate-900 border border-slate-800 p-5 rounded-2xl shadow-xl">
-        <div className="flex items-center justify-between">
-          <div>
-            <span className="text-[10px] uppercase font-bold text-slate-400">Panel Móvil</span>
-            <h1 className="text-lg font-bold text-white flex items-center gap-2">
-              <span>{user?.full_name || 'Conductor'}</span>
-              <span className="text-xs px-2 py-0.5 rounded bg-indigo-950 text-indigo-300 border border-indigo-800">
-                {user?.vehicle_type || 'Moto'}
-              </span>
-            </h1>
+    <div className="max-w-2xl mx-auto px-4 py-8 space-y-6">
+
+      {/* Driver Header Profile Card */}
+      <div className="bg-white border border-slate-200/80 p-6 rounded-3xl shadow-xs">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 rounded-2xl bg-blue-50 border border-blue-200/60 text-blue-600 flex items-center justify-center font-bold text-lg shadow-xs">
+              <Navigation className="w-6 h-6" strokeWidth={2} />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h1 className="text-lg font-bold text-slate-900">{user?.full_name || 'Conductor'}</h1>
+                <span className="text-[10px] uppercase font-bold px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 border border-blue-200/60">
+                  {user?.vehicle_type || 'Vehículo'}
+                </span>
+              </div>
+              <p className="text-xs text-slate-500 mt-0.5">Terminal móvil de entregas y confirmación</p>
+            </div>
           </div>
 
           {/* GPS Broadcast Button */}
           <button
             onClick={toggleGpsBroadcast}
-            className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition shadow-lg ${
+            className={`flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-xs font-semibold transition-all shadow-xs ${
               gpsActive
-                ? 'bg-emerald-600 text-white shadow-emerald-950 animate-pulse'
-                : 'bg-slate-800 text-slate-300 hover:bg-slate-700 border border-slate-700'
+                ? 'bg-emerald-600 text-white shadow-emerald-200'
+                : 'bg-slate-100 hover:bg-slate-200/70 text-slate-700 border border-slate-200'
             }`}
           >
-            <Radio className="w-4 h-4" />
-            <span>{gpsActive ? 'GPS Activo' : 'Activar GPS'}</span>
+            <Radio className={`w-4 h-4 ${gpsActive ? 'animate-pulse' : ''}`} />
+            <span>{gpsActive ? 'GPS Activo' : 'Transmitir GPS'}</span>
           </button>
         </div>
 
         {statusMessage && (
-          <div className="mt-3 text-xs text-emerald-400 bg-emerald-950/40 p-2 rounded-lg border border-emerald-900/60">
-            {statusMessage}
+          <div className="mt-4 text-xs text-emerald-800 bg-emerald-50 border border-emerald-200/80 p-2.5 rounded-xl flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
+            <span>{statusMessage}</span>
           </div>
         )}
       </div>
 
-      {/* Orders Heading */}
-      <div className="flex items-center justify-between">
-        <h2 className="text-sm font-bold text-slate-200 flex items-center gap-2">
-          <Package className="w-4 h-4 text-emerald-400" />
-          <span>Mis Entregas Asignadas ({orders.length})</span>
-        </h2>
+      {/* Heading & refresh */}
+      <div className="flex items-center justify-between px-1">
+        <div className="flex items-center gap-2">
+          <Package className="w-4 h-4 text-slate-500" />
+          <h2 className="text-sm font-bold text-slate-900">
+            Entregas Asignadas ({orders.length})
+          </h2>
+        </div>
         <button
           onClick={loadDriverOrders}
-          className="text-xs text-indigo-400 hover:underline"
+          className="flex items-center gap-1.5 text-xs font-medium text-blue-600 hover:text-blue-700 transition"
         >
-          Actualizar lista
+          <RotateCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+          <span>Actualizar</span>
         </button>
       </div>
 
       {/* Orders List */}
-      <div className="space-y-3.5">
+      <div className="space-y-4">
         {orders.length === 0 ? (
-          <div className="bg-slate-900 border border-slate-800 p-8 rounded-2xl text-center text-slate-400 text-sm">
-            No tienes entregas pendientes asignadas en este momento.
+          <div className="bg-white border border-slate-200/80 p-10 rounded-3xl text-center text-slate-500 text-sm">
+            No tienes órdenes de entrega asignadas en este momento.
           </div>
         ) : (
           orders.map((order) => (
             <div
               key={order.id}
-              className="bg-slate-900 border border-slate-800 p-4 rounded-2xl shadow-lg space-y-3"
+              className="bg-white border border-slate-200/80 p-5 rounded-3xl shadow-xs space-y-4 hover:border-slate-300 transition"
             >
               <div className="flex items-center justify-between">
-                <span className="font-mono text-xs font-bold text-emerald-400">
+                <span className="font-mono text-xs font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md border border-blue-200/60">
                   {order.tracking_number}
                 </span>
                 <span
-                  className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                  className={`px-2.5 py-0.5 rounded-full text-[11px] font-semibold border ${
                     order.status === 'DELIVERED'
-                      ? 'bg-emerald-950 text-emerald-300 border border-emerald-800'
+                      ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
                       : order.status === 'IN_TRANSIT'
-                      ? 'bg-purple-950 text-purple-300 border border-purple-800'
-                      : 'bg-amber-950 text-amber-300 border border-amber-800'
+                      ? 'bg-purple-50 text-purple-700 border-purple-200'
+                      : 'bg-amber-50 text-amber-700 border-amber-200'
                   }`}
                 >
-                  {order.status}
+                  {order.status === 'DELIVERED'
+                    ? 'Entregado'
+                    : order.status === 'IN_TRANSIT'
+                    ? 'En Ruta'
+                    : 'Pendiente'}
                 </span>
               </div>
 
               <div>
-                <h3 className="font-semibold text-white text-sm">{order.client_name}</h3>
-                <div className="flex items-start gap-1.5 text-xs text-slate-300 mt-1">
-                  <MapPin className="w-3.5 h-3.5 text-slate-500 shrink-0 mt-0.5" />
+                <h3 className="font-semibold text-slate-900 text-sm">{order.client_name}</h3>
+                <div className="flex items-start gap-2 text-xs text-slate-600 mt-1">
+                  <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0 mt-0.5" />
                   <span>{order.delivery_address}</span>
                 </div>
               </div>
 
               {order.client_phone && (
-                <div className="flex items-center gap-1.5 text-xs text-slate-400">
-                  <Phone className="w-3.5 h-3.5 text-slate-500" />
+                <div className="flex items-center gap-2 text-xs text-slate-500">
+                  <Phone className="w-3.5 h-3.5 text-slate-400" />
                   <a
                     href={`tel:${order.client_phone}`}
-                    className="hover:text-emerald-400 underline"
+                    className="hover:text-blue-600 font-medium underline"
                   >
                     {order.client_phone}
                   </a>
@@ -233,15 +248,14 @@ export const DriverView = () => {
               )}
 
               {/* Action Buttons */}
-              <div className="pt-2 border-t border-slate-800 flex items-center justify-between gap-2">
-                {/* External Maps link */}
+              <div className="pt-3 border-t border-slate-100 flex items-center justify-between gap-2">
                 <a
                   href={`https://www.google.com/maps/dir/?api=1&destination=${order.dest_lat},${order.dest_lng}`}
                   target="_blank"
                   rel="noreferrer"
-                  className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium transition"
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200/80 text-slate-700 text-xs font-medium transition"
                 >
-                  <Navigation className="w-3.5 h-3.5 text-indigo-400" />
+                  <Navigation className="w-3.5 h-3.5 text-blue-600" />
                   <span>Navegar</span>
                 </a>
 
@@ -250,22 +264,22 @@ export const DriverView = () => {
                     {order.status !== 'IN_TRANSIT' && (
                       <button
                         onClick={() => handleStartDelivery(order.id)}
-                        className="px-3 py-1.5 rounded-lg bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold transition"
+                        className="px-3.5 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-semibold transition shadow-xs"
                       >
                         Iniciar Ruta
                       </button>
                     )}
                     <button
                       onClick={() => setSelectedOrderForSignature(order)}
-                      className="flex items-center gap-1 px-3.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition shadow-md shadow-emerald-950"
+                      className="flex items-center gap-1.5 px-4 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold transition shadow-xs"
                     >
                       <CheckCircle className="w-3.5 h-3.5" />
                       <span>Firmar y Entregar</span>
                     </button>
                   </div>
                 ) : (
-                  <span className="flex items-center gap-1 text-xs text-emerald-400 font-semibold">
-                    <ShieldCheck className="w-4 h-4" />
+                  <span className="flex items-center gap-1.5 text-xs text-emerald-700 font-semibold bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200/60">
+                    <ShieldCheck className="w-4 h-4 text-emerald-600" />
                     <span>Entrega completada</span>
                   </span>
                 )}

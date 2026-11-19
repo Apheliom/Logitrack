@@ -15,8 +15,9 @@ const ProtectedRoute = ({ children, allowedRoles = [] }) => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-slate-950 flex items-center justify-center text-slate-400 text-sm">
-        Verificando sesión...
+      <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center text-slate-500 text-sm gap-2">
+        <div className="w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
+        <span>Iniciando sesión segura...</span>
       </div>
     );
   }
@@ -37,7 +38,7 @@ export function App() {
     <BrowserRouter>
       <AuthProvider>
         <SocketProvider>
-          <div className="min-h-screen bg-slate-950 flex flex-col font-sans">
+          <div className="min-h-screen bg-slate-50/60 text-slate-900 flex flex-col font-sans antialiased">
             <Navbar />
             <main className="flex-1">
               <Routes>
