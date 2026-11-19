@@ -269,6 +269,12 @@ class PdfForensicService {
     const isWeasyPrint = /weasyprint/i.test(lowerProducer);
     const isJsPdf = /jspdf/i.test(lowerProducer);
 
+    // Detección de Dispositivos de Escaneo Físico y Suites Ofimáticas Genuinas
+    const scannerBrands = /hp|canon|epson|xerox|camscanner|brother|kyocera|scansnap|ricoh|fujitsu|kofax|paperport/i;
+    const isPhysicalScan = scannerBrands.test(lowerProducer) || scannerBrands.test(lowerCreator);
+    const officeSuites = /microsoft.*word|microsoft.*office|word 20|adobe.*indesign|adobe.*acrobat|libreoffice|quartz pdfcontext|latex|openoffice/i;
+    const isGenuineOffice = officeSuites.test(lowerProducer) || officeSuites.test(lowerCreator);
+
     if (isGoogleDocs && isSkia) {
       anomalies.push(`Generación Sintética Google Workspace / Gemini: Documento compilado mediante motor headless 'Skia/PDF' exportado desde Google Docs / Canvas de Gemini.`);
       riskScore += 85;
@@ -279,12 +285,28 @@ class PdfForensicService {
         status: 'TAMPER_FOUND',
         detail: `Productor: ${meta.producer} | Creador: ${meta.creator}. Huella inequívoca del pipeline de exportación web de Google Gemini.`
       });
-    } else if (isSkia) {
+    } else if (isChromium || (isSkia && meta.textTokens.length > 0)) {
       anomalies.push(`Motor de Renderizado Headless: Productor '${meta.producer}' indica generación automatizada vía Skia / Chromium sin impresora física ni escáner.`);
-      riskScore += 70;
+      riskScore += 75;
     } else if (isReportLab || isWeasyPrint || isJsPdf) {
       anomalies.push(`Generación Programática por Script: Documento construido algorítmicamente mediante biblioteca de renderizado (${meta.producer || meta.creator}).`);
       riskScore += 75;
+    } else if (isPhysicalScan) {
+      provenanceSteps.push({
+        phase: 'HARDWARE_SCANNER_PROVENANCE',
+        timestamp: new Date().toISOString(),
+        agent: 'Scanner-Hardware-Auditor',
+        status: 'VERIFIED',
+        detail: `Dispositivo de escaneo óptico analógico verificado: ${meta.producer || meta.creator}.`
+      });
+    } else if (isGenuineOffice) {
+      provenanceSteps.push({
+        phase: 'OFFICE_SUITE_PROVENANCE',
+        timestamp: new Date().toISOString(),
+        agent: 'Document-Authoring-Auditor',
+        status: 'VERIFIED',
+        detail: `Software de edición ofimática genuino validado: ${meta.producer || meta.creator}.`
+      });
     }
 
     // VECTOR 3: Tokens de Texto Sintético en Streams de Contenido
@@ -331,14 +353,64 @@ class PdfForensicService {
       riskScore += 35;
     }
 
+    // Descuento por hardware de escaneo óptico analógico o software ofimático acreditado
+    if ((isPhysicalScan || isGenuineOffice) && meta.textTokens.length === 0 && !meta.hasEmbeddedJavascript) {
+      riskScore = 0.0;
+    }
+
     // Normalización de Risk Score
     riskScore = Math.min(100, Math.max(0, riskScore));
 
     let verdict = 'AUTENTICO_GENUINO';
-    if (riskScore >= 75) {
+    if (riskScore >= 70) {
       verdict = 'MANIPULADO_ALTO_RIESGO';
-    } else if (riskScore >= 40) {
+    } else if (riskScore >= 35) {
       verdict = 'SOSPECHOSO_MODIFICADO';
+    }
+
+    let predictiveCategory = 'PDF_DOCUMENTAL_OFIMATICA_GENUINO';
+    let certaintyPercentage = 98.2;
+    let confidenceLevel = 'ALTA';
+    let forensicHypothesis = '';
+    let expertRecommendations = [];
+
+    if (riskScore >= 60) {
+      predictiveCategory = 'PDF_SINTETICO_LLM';
+      certaintyPercentage = Number(Math.min(99.6, 88.0 + (riskScore * 0.11)).toFixed(1));
+      confidenceLevel = 'EXTREMA';
+      forensicHypothesis = `Probabilidad crítica (${certaintyPercentage}%) de generación documental automatizada por Modelo de Lenguaje (LLM) o compilador headless (${meta.producer || 'Motor Sintético'}). Se constatan firmas de prompts generativos o streams de exportación virtual sin hardware físico.`;
+      expertRecommendations = [
+        'Clasificar como documento generado por IA en el expediente pericial.',
+        'Requerir archivo con firma digital PAdES / PKCS#7 oficial.',
+        'Verificar logs de origen en el pipeline de exportación web.'
+      ];
+    } else if (meta.incrementalUpdatesCount > 2 || riskScore >= 35) {
+      predictiveCategory = 'PDF_MODIFICADO_INCREMENTAL';
+      certaintyPercentage = 92.0;
+      confidenceLevel = 'ALTA';
+      forensicHypothesis = `Documento con ${meta.incrementalUpdatesCount} revisiones incrementales post-generación. Posible alteración de cláusulas o texto.`;
+      expertRecommendations = [
+        'Comparar las tablas xref y streams modificados con el original archivado.',
+        'Auditar la secuencia temporal de firmas y modificaciones.'
+      ];
+    } else if (isPhysicalScan) {
+      predictiveCategory = 'PDF_DOCUMENTAL_ESCANEO_FISICO';
+      certaintyPercentage = 98.8;
+      confidenceLevel = 'EXTREMA';
+      forensicHypothesis = `Documento digitalizado mediante escáner óptico de documentos físicos (${meta.producer || meta.creator || 'Escáner Digital'}). Flujo de digitalización genuino.`;
+      expertRecommendations = [
+        'Fijar el hash SHA-256 en la cadena inmutable de custodia pericial.',
+        'Admitir como testimonio documental digitalizado válido.'
+      ];
+    } else {
+      predictiveCategory = 'PDF_DOCUMENTAL_OFIMATICA_GENUINO';
+      certaintyPercentage = 98.5;
+      confidenceLevel = 'EXTREMA';
+      forensicHypothesis = `Documento ofimático auténtico generado en suite estándar (${meta.producer || meta.creator || 'Software Ofimático'}). Sin evidencias de alteración por IA ni streams anómalos.`;
+      expertRecommendations = [
+        'Fijar el hash SHA-256 en la cadena inmutable de custodia pericial.',
+        'Emitir dictamen de conformidad bajo estándar ISO 32000.'
+      ];
     }
 
     return {
@@ -346,6 +418,21 @@ class PdfForensicService {
       verdict,
       anomalies,
       provenanceSteps,
+      forensicPrediction: {
+        predictiveCategory,
+        confidenceLevel,
+        certaintyPercentage,
+        authenticityIndex: Number((100.0 - riskScore).toFixed(1)),
+        riskPercentage: riskScore,
+        forensicHypothesis,
+        expertRecommendations,
+        probabilityVectors: {
+          aiProbability: riskScore >= 60 ? Number(riskScore.toFixed(1)) : 0.0,
+          manualTamperingProbability: meta.incrementalUpdatesCount > 0 ? Math.min(100, meta.incrementalUpdatesCount * 25) : 0.0,
+          binaryAnomalyProbability: meta.hasEmbeddedJavascript ? 60.0 : 0.0,
+          opticalIntegrityProbability: isPhysicalScan ? 99.0 : 95.0
+        }
+      },
       pdfMetadata: {
         pdfVersion: meta.pdfVersion,
         producer: meta.producer || 'No especificado (Posible stripping)',

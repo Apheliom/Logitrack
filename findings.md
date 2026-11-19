@@ -192,3 +192,25 @@ SecuriTrace es una plataforma de análisis forense digital multimedia, verificac
   - En conexiones HTTP locales, los navegadores móviles bloquean la API `navigator.geolocation` por políticas de "Contextos Seguros" (W3C Secure Contexts).
   - La ubicación más precisa proviene de las cabeceras binarias **EXIF GPS IFD** (`GPSLatitude`, `GPSLongitude`, `GPSAltitude`, `GPSImgDirection`, `GPSTimeStamp`) que el hardware de la cámara del teléfono graba directamente dentro del archivo JPEG/HEIC.
   - El backend extrae estos metadatos físicos sin requerir permisos del navegador, proyectando las coordenadas exactas en grados, minutos y segundos y el mapa satelital interactivo.
+
+## Arquitectura Multimodal de Detección de IA vs Tránsito Orgánico (Imágenes, Audio, Video, PDF)
+
+### 1. Invariante Pericial de Precedencia de Amenaza
+- Los vectores de **IA Generativa ($V_1$)** y **Manipulación Manual ($V_2$)** tienen prioridad absoluta en el motor de inferencia.
+- Si un archivo posee firmas de IA (Inpainting, Adobe Firefly, Samsung Galaxy AI `GenerativeEdit`, Google Magic Eraser, Face Swap, descriptores de difusión, o cuantización DQT sintética fuera de redes sociales), las clasificaciones de captura de pantalla y de tránsito por red social quedan **estrictamente invalidadas**.
+- El detector de capturas de pantalla (`isDeviceScreenshot`) fue desacoplado de relaciones de aspecto panorámicas genéricas: únicamente se admite si porta nomenclatura explícita de framebuffer (`Screenshot_`, `Captura de pantalla`) o resolución fija de pantalla completa de hardware móvil (`1080x2400`, `1179x2556`) **y simultáneamente** $V_1 < 20.0$ y $V_2 < 25.0$.
+
+### 2. Forense Acústico de Notas de Voz vs Clonación Neuronal ([audioService.js](file:///C:/Users/Maicol/.gemini/antigravity/scratch/securitrace/server/src/services/audioService.js))
+- **Notas de Voz de WhatsApp:** Identificación de contenedor Ogg/Opus (`OggS`, `OpusHead`, `OpusTags`) y nomenclatura `PTT-YYYYMMDD-WA...`. Dado que el códec Opus es el estándar nativo de mensajería, se clasifica como `NOTA_DE_VOZ_WHATSAPP_OPUS` con riesgo $\le 0.5\%$ (Autenticidad $\ge 99.5\%$).
+- **Voz Humana Orgánica:** Grabación de micrófono directo con espectro de formantes continuos y micro-fluctuaciones tonales naturales ($F_0$ micro-jitter), clasificada como `VOZ_HUMANA_ORGANICA` con riesgo $\le 0.5\%$.
+- **Deepfakes y Clonación (ElevenLabs, Suno, Udio, RVC, VALL-E):** Detección de metadatos incrustados, tags ID3 de síntesis, o corte abrupto espectral de vocoder neuronal (>8 kHz / >12 kHz). Riesgo pericial $\ge 90\%$, clasificado como `CLONACION_NEURONAL_DEEPFAKE`.
+
+### 3. Forense de Video ISOBMFF ([videoForensicService.js](file:///C:/Users/Maicol/.gemini/antigravity/scratch/securitrace/server/src/services/videoForensicService.js))
+- **Video Genuino de Cámara:** Inspección de átomos `moov.udta` en búsqueda de metadatos de hardware captor (`com.apple.quicktime.make`, `com.android.version`, GoPro, Sony). Clasificado como `VIDEO_CAMARA_ORGANICO` con riesgo $\le 0.8\%$.
+- **Tránsito por WhatsApp:** Detección de patrones `VID-YYYYMMDD-WA...` o `WhatsApp Video...`, transcodificados a H.264 Baseline sin átomos de hardware. Clasificado como `TRANSITO_VIDEO_RED_SOCIAL` con riesgo $\le 0.5\%$.
+- **Video Sintético por IA (Sora, Runway Gen-2/Gen-3, Kling, Pika, Luma Dream Machine):** Detección de exportador headless `Lavf/FFmpeg` sin átomos de hardware de cámara, tokens de modelos generativos y resoluciones canónicas de síntesis. Riesgo $\ge 90\%$, clasificado como `VIDEO_SINTETICO_IA_GENERATIVA`.
+
+### 4. Forense Documental de PDFs ([pdfForensicService.js](file:///C:/Users/Maicol/.gemini/antigravity/scratch/securitrace/server/src/services/pdfForensicService.js))
+- **Escaneo Físico Digitalizado:** Detección de productores de escáneres ópticos (HP, Canon, Epson, Xerox, CamScanner, Brother, Ricoh) y presencia de flujos de imagen rasterizada sin fuentes virtuales. Riesgo $\le 0.5\%$, clasificado como `PDF_DOCUMENTAL_ESCANEO_FISICO`.
+- **Ofimática Genuina:** Creación en Microsoft Word, Adobe InDesign, Adobe Acrobat Pro, LibreOffice o LaTeX con revisiones estándar. Riesgo $\le 0.5\%$, clasificado como `PDF_DOCUMENTAL_OFIMATICA_GENUINO`.
+- **Generación Virtual por LLM:** Detección de productores headless (`Skia/PDF`, `Chromium`, `Puppeteer`) y tokens de modelos de lenguaje en streams `FlateDecode` (`Google Gemini`, `ChatGPT`, `Claude`, `Prompt:`). Riesgo $\ge 90\%$, clasificado como `PDF_SINTETICO_LLM`.

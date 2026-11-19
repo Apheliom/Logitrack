@@ -1,6 +1,7 @@
 const crypto = require('crypto');
 const exifr = require('exifr');
 const PdfForensicService = require('./pdfForensicService');
+const VideoForensicService = require('./videoForensicService');
 
 /**
  * Motor Forense de Máxima Precisión y Trazabilidad de Procedencia Digital (SecuriTrace Core Engine)
@@ -91,11 +92,18 @@ class ForensicService {
    */
   static scanBinaryForAIFingerprints(buffer) {
     const findings = [];
-    const bufferSample = buffer.subarray(0, Math.min(buffer.length, 524288)).toString('binary');
-    const lowerBuffer = bufferSample.toLowerCase();
+    if (!buffer || buffer.length === 0) return findings;
 
-    // 1. Estándar C2PA / JUMBF
-    if (bufferSample.includes('c2pa') || bufferSample.includes('jumbf') || bufferSample.includes('C2PA')) {
+    // Escanear tanto el inicio (primeros 1 MB) como la cola (últimos 512 KB) para capturar metadatos XMP/IPTC/C2PA
+    const headLen = Math.min(buffer.length, 1048576);
+    const headStr = buffer.subarray(0, headLen).toString('binary');
+    const tailStart = Math.max(0, buffer.length - 524288);
+    const tailStr = buffer.subarray(tailStart).toString('binary');
+    const combinedStr = headStr + '\n' + tailStr;
+    const lowerBuffer = combinedStr.toLowerCase();
+
+    // 1. Estándar C2PA / JUMBF (Content Credentials)
+    if (combinedStr.includes('c2pa') || combinedStr.includes('jumbf') || combinedStr.includes('C2PA')) {
       findings.push({
         type: 'C2PA_MANIFEST',
         detail: 'Contenedor criptográfico JUMBF / C2PA (Content Credentials) detectado en cabecera binaria'
@@ -146,11 +154,32 @@ class ForensicService {
       });
     }
 
-    // 5. Inpainting, Generative Fill y Edición Generativa sobre Fotos Reales
+    // 5. Inpainting, Generative Fill y Edición Generativa sobre Fotos Reales (Adobe, Samsung, Google, Apple)
     if (lowerBuffer.includes('generative fill') || lowerBuffer.includes('generative_fill') || lowerBuffer.includes('adobe firefly') || lowerBuffer.includes('firefly') || lowerBuffer.includes('adobe:generative')) {
       findings.push({
         type: 'ADOBE_FIREFLY_GENERATIVE',
         detail: 'Firma de Adobe Firefly / Generative Fill (Relleno Generativo con IA) detectada'
+      });
+    }
+
+    if (lowerBuffer.includes('generativeedit') || lowerBuffer.includes('generative_edit') || lowerBuffer.includes('object_eraser') || lowerBuffer.includes('objecteraser') || lowerBuffer.includes('photoremaster') || lowerBuffer.includes('photo_remaster') || lowerBuffer.includes('sec_photo_editor')) {
+      findings.push({
+        type: 'SAMSUNG_GALAXY_AI',
+        detail: 'Edición asistida por Samsung Galaxy AI (Generative Edit / Object Eraser / Photo Remaster)'
+      });
+    }
+
+    if (lowerBuffer.includes('magic_eraser') || lowerBuffer.includes('magiceraser') || lowerBuffer.includes('google_photos_editor') || lowerBuffer.includes('object_remover')) {
+      findings.push({
+        type: 'GOOGLE_MAGIC_ERASER',
+        detail: 'Manipulación mediante Google Pixel Magic Eraser / Borrador Mágico con IA'
+      });
+    }
+
+    if (lowerBuffer.includes('apple_photo_clean_up') || lowerBuffer.includes('photo_cleanup')) {
+      findings.push({
+        type: 'APPLE_CLEAN_UP',
+        detail: 'Manipulación de imagen mediante Apple Intelligence Clean Up'
       });
     }
 
@@ -168,24 +197,24 @@ class ForensicService {
       });
     }
 
-    if (lowerBuffer.includes('remini') || lowerBuffer.includes('photoroom') || lowerBuffer.includes('topaz') || lowerBuffer.includes('clipdrop') || lowerBuffer.includes('seaart') || lowerBuffer.includes('krea')) {
+    if (lowerBuffer.includes('remini') || lowerBuffer.includes('photoroom') || lowerBuffer.includes('topaz') || lowerBuffer.includes('clipdrop') || lowerBuffer.includes('seaart') || lowerBuffer.includes('krea') || lowerBuffer.includes('faceapp') || lowerBuffer.includes('facetune') || lowerBuffer.includes('picsart') || lowerBuffer.includes('photoleap') || lowerBuffer.includes('meitu')) {
       findings.push({
         type: 'AI_ENHANCER_APP',
-        detail: 'Firma de aplicación de mejora/reconstrucción neuronal de imagen (Remini/PhotoRoom/Clipdrop)'
+        detail: 'Firma de aplicación de mejora/reconstrucción neuronal o retoque facial con IA (Remini/FaceApp/PicsArt/Topaz)'
       });
     }
 
-    // 6. Motores de Video o Audio IA (Sora, Runway, Pika, Suno, ElevenLabs)
+    // 6. Motores de Video o Audio IA (Sora, Runway, Pika, Suno, ElevenLabs, Kling, Luma)
     if (lowerBuffer.includes('elevenlabs') || lowerBuffer.includes('suno.ai') || lowerBuffer.includes('udio')) {
       findings.push({
         type: 'AI_AUDIO_SYNTHESIS',
         detail: 'Firma de síntesis acústica neuronal (ElevenLabs / Suno / Udio)'
       });
     }
-    if (lowerBuffer.includes('runway') || lowerBuffer.includes('pika labs') || lowerBuffer.includes('sora')) {
+    if (lowerBuffer.includes('runway') || lowerBuffer.includes('pika labs') || lowerBuffer.includes('sora') || lowerBuffer.includes('kling') || lowerBuffer.includes('luma dream')) {
       findings.push({
         type: 'AI_VIDEO_SYNTHESIS',
-        detail: 'Firma de renderizado sintético de video por modelo generativo'
+        detail: 'Firma de renderizado sintético de video por modelo generativo (Sora/Runway/Kling/Luma)'
       });
     }
 
@@ -381,9 +410,11 @@ class ForensicService {
 
     let matchedPreset = aiResolutionPresets.find(p => p.w === width && p.h === height);
 
-    // Detección rigurosa de Capturas de Pantalla (Screenshots de Dispositivos Móviles y PC)
-    const isTallScreenRatio = (ratio >= 0.40 && ratio <= 0.58) || (ratio >= 1.70 && ratio <= 2.45);
-    const hasScreenshotKeyword = /screenshot|captura|screen_shot|screen shot|screencap/i.test(filename || '');
+    // Detección estricta de Capturas de Pantalla (Screenshots de Dispositivos Móviles y PC)
+    // Regla pericial: Una captura de pantalla debe portar nomenclatura explícita o coincidir
+    // con la resolución exacta de hardware de pantalla completa (resolución nativa de terminal),
+    // y NUNCA coincidir con presets de difusión latente de IA.
+    const hasScreenshotKeyword = /screenshot|captura|screen_shot|screen shot|screencap|grabaci[oó]n de pantalla/i.test(filename || '');
     const standardScreenResolutions = [
       '1080x2400', '1080x2340', '1080x2280', '1080x1920',
       '720x1600', '720x1560', '720x1520', '720x1280',
@@ -393,9 +424,9 @@ class ForensicService {
       '2532x1170', '2556x1179', '2796x1290', '2778x1284'
     ];
     const isStandardScreenRes = standardScreenResolutions.includes(`${width}x${height}`);
-    const isDeviceScreenshot = (isTallScreenRatio && !isSquare && !matchedPreset) || hasScreenshotKeyword || isStandardScreenRes;
+    const isDeviceScreenshot = (hasScreenshotKeyword || isStandardScreenRes) && !isSquare && !matchedPreset;
 
-    if (isDeviceScreenshot && isTallScreenRatio) {
+    if (isDeviceScreenshot) {
       aspectRatioLabel = ratio < 1.0 ? 'Pantalla Móvil Vertical (Screenshot)' : 'Pantalla Panorámica (Screenshot)';
     }
 
@@ -419,7 +450,7 @@ class ForensicService {
       }
     }
 
-    // Análisis de uniformidad y origen en tablas DQT
+    // Análisis pericial de uniformidad y origen en tablas DQT
     let isSyntheticDqt = false;
     let isWhatsAppDqt = false;
     if (dqtTables.length > 0) {
@@ -431,13 +462,18 @@ class ForensicService {
       for (let i = 0; i < firstTable.length; i++) variance += Math.pow(firstTable[i] - mean, 2);
       const stdDev = Math.sqrt(variance / firstTable.length);
 
-      // Si el archivo transitó por WhatsApp, la tabla DQT proviene del códec libjpeg-turbo de Meta
       if (whatsAppInfo) {
         isWhatsAppDqt = true;
-        isSyntheticDqt = false; // NO se imputa como IA ya que es el códec nativo de red social
+        // Si transitó por WhatsApp pero sólo porta 1 tabla DQT (en vez de luminancia/crominancia)
+        // o la varianza es atípicamente uniforme de renderizador sintético:
+        if (dqtTables.length === 1 || stdDev < 4.2) {
+          isSyntheticDqt = true;
+        }
       } else if (!isDeviceScreenshot) {
-        // Fuera de redes sociales y en imágenes que no son capturas de pantalla:
-        if ((stdDev < 6.8 && mean > 5) || dqtTables.length === 1) {
+        // Fuera de redes sociales y si no es captura de pantalla de framebuffer:
+        // Los sensores de cámara física (Canon, Nikon, Sony, Apple, Samsung) emplean 2 tablas DQT.
+        // Pipelines de IA, exportadores de canvas o generadores emplean 1 sola tabla DQT o stdDev < 7.0:
+        if (dqtTables.length === 1 || (stdDev < 7.0 && mean > 4.5)) {
           isSyntheticDqt = true;
         }
       }
@@ -746,7 +782,22 @@ class ForensicService {
     // -------------------------------------------------------------
     let v4_opticalRaw = 0;
     let opticalBonusCredits = 0;
-    const hasCameraMake = !!(metadata.Make || metadata.Model);
+    const hasCameraMake = !!(
+      metadata.Make || 
+      metadata.Model || 
+      (metadata.make && metadata.make !== 'No registrado (Sensor ausente)') ||
+      (metadata.model && metadata.model !== 'No registrado') ||
+      /samsung|canon|nikon|sony|apple|xiaomi|motorola|huawei|google pixel|olympus|fujifilm|panasonic/i.test(binaryFindings?.map(b => b.detail).join(' ') || '')
+    );
+    const hasHybridEditing = binaryFindings?.some(b => 
+      b.type === 'ADOBE_FIREFLY_GENERATIVE' || 
+      b.type === 'SAMSUNG_GALAXY_AI' || 
+      b.type === 'GOOGLE_MAGIC_ERASER' || 
+      b.type === 'APPLE_CLEAN_UP' || 
+      b.type === 'DIFFUSION_INPAINTING' || 
+      b.type === 'AI_FACE_SWAP' ||
+      b.type === 'AI_ENHANCER_APP'
+    );
     const hasOpticalParams = !!(metadata.ISO || metadata.ExposureTime || metadata.FNumber || metadata.FocalLength);
     const isImage = magicInfo.detectedFormat === 'JPEG' || magicInfo.detectedFormat === 'PNG' || magicInfo.detectedFormat === 'WEBP';
 
@@ -843,12 +894,16 @@ class ForensicService {
     let forensicHypothesis = '';
     let expertRecommendations = [];
 
-    if (v1_capped >= 50.0 || riskScore >= 70.0) {
-      if (hasCameraMake) {
+    // Prioridad 1: Detección de Inteligencia Artificial (Generativa / Inpainting / Face Swap)
+    const isAiThreat = v1_capped >= 30.0 || riskScore >= 60.0;
+    const isManualThreat = v2_capped >= 35.0;
+
+    if (isAiThreat) {
+      if (hasCameraMake || hasHybridEditing) {
         predictiveCategory = 'FOTO_REAL_MANIPULADA_CON_IA';
         certaintyPercentage = Number(Math.min(99.6, 91.0 + (riskScore * 0.08)).toFixed(1));
         confidenceLevel = 'EXTREMA';
-        forensicHypothesis = `Probabilidad crítica (${certaintyPercentage}%) de manipulación generativa híbrida sobre fotografía real (${metadata.Make || 'Cámara'}). Se constatan firmas de cuantización sintética y discontinuidades algorítmicas compatibles con Inpainting / Generative Fill / Face Swap.`;
+        forensicHypothesis = `Probabilidad crítica (${certaintyPercentage}%) de manipulación generativa híbrida sobre fotografía real (${metadata.Make || 'Cámara'}). Se constatan firmas de cuantización sintética y discontinuidades algorítmicas compatibles con Inpainting / Generative Fill / Face Swap / Retoque Neuronal.`;
         expertRecommendations = [
           'Clasificar como fotografía real modificada por IA (Inpainting / Generative Fill / Face Swap).',
           'Solicitar archivo negativo RAW original del dispositivo captor.',
@@ -865,7 +920,7 @@ class ForensicService {
           'Descartar valor pericial como testimonio fotográfico analógico.'
         ];
       }
-    } else if (v2_capped >= 45.0 || (riskScore >= 50.0 && !whatsAppInfo)) {
+    } else if (isManualThreat) {
       predictiveCategory = 'ALTERACION_MANUAL_RETOQUE';
       certaintyPercentage = Number(Math.min(98.2, 76.0 + (riskScore * 0.14)).toFixed(1));
       confidenceLevel = certaintyPercentage >= 90 ? 'ALTA' : 'MODERADA';
@@ -875,7 +930,7 @@ class ForensicService {
         'Efectuar análisis complementario de Nivel de Error (ELA) en bordes de contraste.',
         'Inspeccionar el árbol genealógico de capas XMP.'
       ];
-    } else if (pixelAnalysis?.isDeviceScreenshot) {
+    } else if (pixelAnalysis?.isDeviceScreenshot && v1_capped < 20.0 && v2_capped < 25.0) {
       predictiveCategory = 'CAPTURADEPANTALLA_DISPOSITIVO';
       certaintyPercentage = 98.4;
       confidenceLevel = 'EXTREMA';
@@ -885,7 +940,7 @@ class ForensicService {
         'Correlacionar la estampa temporal con los registros de actividad del terminal emisor.',
         'Fijar el hash SHA-256 en el expediente pericial.'
       ];
-    } else if (whatsAppInfo) {
+    } else if (whatsAppInfo && v1_capped < 20.0 && v2_capped < 25.0) {
       predictiveCategory = 'TRANSITO_RED_SOCIAL_SANITIZADO';
       certaintyPercentage = 93.4;
       confidenceLevel = 'ALTA';
@@ -963,39 +1018,11 @@ class ForensicService {
     if (magicInfo.detectedFormat === 'PDF') {
       pdfForensicReport = PdfForensicService.analyzePdf(buffer, originalname);
       
-      const pdfCertainty = Number(Math.min(99.6, 85.0 + (pdfForensicReport.riskScore * 0.14)).toFixed(1));
-      const pdfPrediction = {
-        predictiveCategory: pdfForensicReport.riskScore >= 70 ? 'PDF_SINTETICO_LLM' : (pdfForensicReport.riskScore >= 40 ? 'PDF_MODIFICADO_INCREMENTAL' : 'PDF_DOCUMENTAL_GENUINO'),
-        confidenceLevel: pdfCertainty >= 95 ? 'EXTREMA' : 'ALTA',
-        certaintyPercentage: pdfCertainty,
-        authenticityIndex: Number((100.0 - pdfForensicReport.riskScore).toFixed(1)),
-        riskPercentage: pdfForensicReport.riskScore,
-        forensicHypothesis: pdfForensicReport.riskScore >= 70
-          ? `Alta probabilidad (${pdfCertainty}%) de generación algorítmica por LLM / Pipeline Headless (${pdfForensicReport.pdfMetadata.producer || 'Motor Sintético'}). El documento carece de firma criptográfica y presenta marcadores de exportador virtual.`
-          : `Documento PDF con trazabilidad estándar. Integridad estructural validada bajo ISO 32000.`,
-        expertRecommendations: pdfForensicReport.riskScore >= 70
-          ? [
-              'Requerir documento firmado electrónicamente con certificado PAdES / X.509.',
-              'Verificar en el servidor emisor los registros de generación de Puppeteer/Skia.',
-              'Auditar la presencia de streams comprimidos FlateDecode sospechosos.'
-            ]
-          : [
-              'Fijar el hash SHA-256 en la cadena inmutable de custodia.',
-              'Validar ausencia de scripts JavaScript embebidos.'
-            ],
-        probabilityVectors: {
-          aiProbability: Number(pdfForensicReport.riskScore.toFixed(1)),
-          manualTamperingProbability: Number((pdfForensicReport.pdfMetadata.incrementalUpdates * 25).toFixed(1)),
-          binaryAnomalyProbability: pdfForensicReport.anomalies.length > 0 ? 40.0 : 5.0,
-          opticalIntegrityProbability: 0.0 // Los PDFs son documentos digitales, no tienen sensor óptico
-        }
-      };
-
       evaluation = {
         riskScore: pdfForensicReport.riskScore,
         verdict: pdfForensicReport.verdict,
         anomalies: pdfForensicReport.anomalies,
-        forensicPrediction: pdfPrediction,
+        forensicPrediction: pdfForensicReport.forensicPrediction,
         aiAnalysis: {
           isAiGenerated: pdfForensicReport.riskScore >= 70,
           score: pdfForensicReport.riskScore,
@@ -1014,10 +1041,35 @@ class ForensicService {
       timeline = [...pdfForensicReport.provenanceSteps, ...timeline];
     }
 
+    // Módulo especializado: Análisis Forense de Video (MP4 / QuickTime / ISOBMFF)
+    let videoForensicReport = null;
+    if (magicInfo.category === 'VIDEO' || magicInfo.detectedFormat.includes('Video') || (mimetype && mimetype.startsWith('video/'))) {
+      videoForensicReport = VideoForensicService.analyzeVideo(buffer, originalname);
+      evaluation = {
+        riskScore: videoForensicReport.riskScore,
+        verdict: videoForensicReport.verdict,
+        anomalies: videoForensicReport.anomalies,
+        forensicPrediction: videoForensicReport.forensicPrediction,
+        aiAnalysis: {
+          isAiGenerated: videoForensicReport.riskScore >= 60,
+          score: videoForensicReport.riskScore,
+          category: videoForensicReport.riskScore >= 60 ? 'SINTETICO_COMPLETO' : 'NO_DETECTADO',
+          detectedModels: videoForensicReport.videoMetadata.detectedAiModels,
+          findings: videoForensicReport.anomalies.filter(a => a.toLowerCase().includes('ia') || a.toLowerCase().includes('video') || a.toLowerCase().includes('sintético'))
+        },
+        manualEditAnalysis: {
+          isManuallyEdited: false,
+          score: 0,
+          software: videoForensicReport.videoMetadata.encoderTag,
+          findings: []
+        }
+      };
+    }
+
     const formattedMetadata = {
-      make: pdfForensicReport ? `Motor PDF: ${pdfForensicReport.pdfMetadata.producer}` : (rawMetadata.Make || 'No registrado (Sensor ausente)'),
-      model: pdfForensicReport ? `Creador: ${pdfForensicReport.pdfMetadata.creator}` : (rawMetadata.Model || 'No registrado'),
-      software: pdfForensicReport ? pdfForensicReport.pdfMetadata.producer : (rawMetadata.Software || rawMetadata.CreatorTool || rawMetadata.ProcessingSoftware || 'Sin software registrado'),
+      make: pdfForensicReport ? `Motor PDF: ${pdfForensicReport.pdfMetadata.producer}` : (videoForensicReport ? videoForensicReport.videoMetadata.cameraHardware : (rawMetadata.Make || 'No registrado (Sensor ausente)')),
+      model: pdfForensicReport ? `Creador: ${pdfForensicReport.pdfMetadata.creator}` : (videoForensicReport ? `Encoder: ${videoForensicReport.videoMetadata.encoderTag}` : (rawMetadata.Model || 'No registrado')),
+      software: pdfForensicReport ? pdfForensicReport.pdfMetadata.producer : (videoForensicReport ? videoForensicReport.videoMetadata.encoderTag : (rawMetadata.Software || rawMetadata.CreatorTool || rawMetadata.ProcessingSoftware || 'Sin software registrado')),
       dateTimeOriginal: pdfForensicReport ? pdfForensicReport.pdfMetadata.creationDate : (rawMetadata.DateTimeOriginal ? new Date(rawMetadata.DateTimeOriginal).toISOString() : 'No disponible (Stripped)'),
       modifyDate: pdfForensicReport ? pdfForensicReport.pdfMetadata.modDate : (rawMetadata.ModifyDate ? new Date(rawMetadata.ModifyDate).toISOString() : 'No disponible'),
       imageWidth: pixelAnalysis ? pixelAnalysis.width : (rawMetadata.ImageWidth || rawMetadata.ExifImageWidth || 'N/A'),
