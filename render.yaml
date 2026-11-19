@@ -1,0 +1,42 @@
+services:
+  # 1. Backend Web Service (Node.js API + Socket.io)
+  - type: web
+    name: logitrack-backend
+    env: node
+    rootDir: server
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000
+      - key: DATABASE_URL
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true
+      - key: CLIENT_ORIGIN
+        value: "*"
+
+  # 2. Frontend Static Site (React Vite SPA)
+  - type: web
+    name: logitrack-frontend
+    env: static
+    rootDir: client
+    buildCommand: npm install && npm run build
+    staticPublishPath: dist
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    envVars:
+      - key: VITE_API_URL
+        fromService:
+          type: web
+          name: logitrack-backend
+          property: host
+      - key: VITE_SOCKET_URL
+        fromService:
+          type: web
+          name: logitrack-backend
+          property: host
