@@ -1,14 +1,22 @@
 {
-  "name": "logitrack-root",
+  "name": "logitrack",
   "version": "1.0.0",
   "private": true,
-  "description": "LogiTrack Monorepo Root",
+  "description": "LogiTrack - Monitoreo y Optimización Logística (Render Ready)",
+  "main": "server/src/server.js",
   "scripts": {
     "install:all": "npm --prefix server install && npm --prefix client install",
-    "build:client": "npm --prefix client install && npm --prefix client run build",
-    "build": "npm --prefix server install && npm --prefix client install && npm --prefix client run build",
-    "start": "npm --prefix server start",
-    "dev:server": "npm --prefix server run dev",
-    "dev:client": "npm --prefix client run dev"
+    "build": "npm --prefix client install && npm --prefix client run build && npm --prefix server install",
+    "start": "node server/src/server.js",
+    "dev": "npm --prefix server run dev"
+  },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "jsonwebtoken": "^9.0.2",
+    "pg": "^8.11.5",
+    "socket.io": "^4.7.5"
   }
 }

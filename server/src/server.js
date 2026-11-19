@@ -63,11 +63,44 @@ app.use('/api/orders', orderRoutes);
 app.use('/api/drivers', driverRoutes);
 app.use('/api/routes', routeRoutes);
 
-// Manejador 404
-app.use((req, res) => {
+// Servir frontend compilado de React (client/dist) en producción
+const path = require('path');
+const fs = require('fs');
+const clientDistPath = path.resolve(__dirname, '../../client/dist');
+
+if (fs.existsSync(clientDistPath)) {
+  console.log(`[Static] Sirviendo interfaz web desde: ${clientDistPath}`);
+  app.use(express.static(clientDistPath));
+
+  // Soporte SPA: Cualquier ruta que no sea API sirve index.html
+  app.get('*', (req, res, next) => {
+    if (req.url.startsWith('/api') || req.url === '/healthz' || req.url.startsWith('/socket.io')) {
+      return next();
+    }
+    res.sendFile(path.join(clientDistPath, 'index.html'));
+  });
+} else {
+  console.warn(`[Static Warning] No se encontró la carpeta ${clientDistPath}. Corriendo solo en modo API.`);
+  app.get('/', (req, res) => {
+    res.json({
+      name: 'LogiTrack API',
+      status: 'ONLINE',
+      message: 'API operativa. Para ver la interfaz web, asegúrate de compilar client/dist.',
+      endpoints: {
+        health: '/healthz',
+        auth: '/api/auth',
+        orders: '/api/orders',
+        tracking: '/api/orders/track/:trackingNumber'
+      }
+    });
+  });
+}
+
+// Manejador 404 para rutas API no existentes
+app.use('/api/*', (req, res) => {
   res.status(404).json({
     success: false,
-    message: `Ruta no encontrada: ${req.method} ${req.url}`
+    message: `Ruta API no encontrada: ${req.method} ${req.url}`
   });
 });
 
