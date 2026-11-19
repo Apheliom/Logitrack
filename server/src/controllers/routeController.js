@@ -25,8 +25,8 @@ const optimizeRouteForDriver = async (req, res) => {
 
     const driver = driverRes.rows[0];
     const startPoint = {
-      lat: driver.current_lat || 4.6534,
-      lng: driver.current_lng || -74.0836
+      lat: driver.current_lat || 10.0305,
+      lng: driver.current_lng || -69.2635
     };
 
     // 2. Obtener órdenes a optimizar (toma las asignadas al conductor O las órdenes libres pendientes)
@@ -152,7 +152,7 @@ const getActiveRoutes = async (req, res) => {
     if (result.rows.length === 0) {
       const ordersRes = await db.query('SELECT dest_lat, dest_lng FROM orders ORDER BY created_at ASC LIMIT 6');
       if (ordersRes.rows.length > 0) {
-        const depot = [4.6534, -74.0836];
+        const depot = [10.0305, -69.2635];
         const coordinates = [
           [depot[1], depot[0]],
           ...ordersRes.rows.map(o => [Number(o.dest_lng), Number(o.dest_lat)])

@@ -48,7 +48,7 @@ const register = async (req, res) => {
         await client.query(
           `INSERT INTO drivers (user_id, vehicle_type, license_plate, current_lat, current_lng, is_available, status)
            VALUES ($1, $2, $3, $4, $5, true, 'IDLE')`,
-          [newUser.id, vehicle_type, license_plate || 'SIN-PLACA', 4.6534, -74.0836]
+          [newUser.id, vehicle_type, license_plate || 'SIN-PLACA', 10.0305, -69.2635]
         );
       }
 

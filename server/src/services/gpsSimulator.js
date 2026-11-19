@@ -6,20 +6,29 @@ class GPSSimulator {
     this.isRunning = false;
     this.io = null;
 
-    // Repartidores simulados con rutas circulares alrededor del centro operativo
+    // Repartidores simulados — Rutas de distribución en Cabudare Centro y Barquisimeto Este (Estado Lara)
+    // Almacén Central de Despacho: Cabudare Centro  lat: 10.0305, lng: -69.2635
     this.simulatedDrivers = [
       {
         id: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
         name: 'Carlos Mendoza (Moto 01)',
         currentStep: 0,
         waypoints: [
-          { lat: 4.6534, lng: -74.0836 },
-          { lat: 4.6560, lng: -74.0750 },
-          { lat: 4.6580, lng: -74.0590 },
-          { lat: 4.6650, lng: -74.0580 },
-          { lat: 4.6710, lng: -74.0560 },
-          { lat: 4.6680, lng: -74.0670 },
-          { lat: 4.6600, lng: -74.0780 }
+          // Almacén Central — Cabudare Centro
+          { lat: 10.0305, lng: -69.2635 },
+          // Av. La Mata c/ Calle 9
+          { lat: 10.0320, lng: -69.2660 },
+          // Sector La Mata (punto intermedio)
+          { lat: 10.0338, lng: -69.2672 },
+          // Farmacia San Rafael — Av. La Mata c/ Calle 9
+          { lat: 10.0350, lng: -69.2680 },
+          // Punto intermedio hacia La Mora
+          { lat: 10.0375, lng: -69.2700 },
+          // Bodegón El Centro — Av. Intercomunal
+          { lat: 10.0420, lng: -69.2740 },
+          // Regreso al almacén vía Urb. Valle Hondo
+          { lat: 10.0380, lng: -69.2700 },
+          { lat: 10.0340, lng: -69.2660 }
         ]
       },
       {
@@ -27,12 +36,19 @@ class GPSSimulator {
         name: 'Laura Gomez (Van 02)',
         currentStep: 0,
         waypoints: [
-          { lat: 4.6480, lng: -74.0620 },
-          { lat: 4.6460, lng: -74.0630 },
-          { lat: 4.6410, lng: -74.0710 },
-          { lat: 4.6450, lng: -74.0800 },
-          { lat: 4.6520, lng: -74.0850 },
-          { lat: 4.6500, lng: -74.0700 }
+          // Almacén Central — Cabudare Centro
+          { lat: 10.0305, lng: -69.2635 },
+          // Urb. Valle Hondo intermedio
+          { lat: 10.0370, lng: -69.2730 },
+          // Centro Médico Valle Hondo — Calle 3
+          { lat: 10.0460, lng: -69.2810 },
+          // Punto intermedio hacia Barquisimeto
+          { lat: 10.0520, lng: -69.2880 },
+          // Comercial Los Cardones — Av. Los Leones
+          { lat: 10.0620, lng: -69.2980 },
+          // Regreso al almacén
+          { lat: 10.0500, lng: -69.2850 },
+          { lat: 10.0380, lng: -69.2730 }
         ]
       }
     ];

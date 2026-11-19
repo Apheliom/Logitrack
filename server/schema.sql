@@ -100,18 +100,18 @@ VALUES
     ('44444444-4444-4444-4444-444444444444', 'cliente@logitrack.com', '$2a$10$UUWM1YtjlFrdaGtbWLEH6.Unls3TePupkui3PX4KGLmgIRWTnSvci', 'Supermercado Central', 'CLIENT', '+1234567893')
 ON CONFLICT (email) DO UPDATE SET password_hash = EXCLUDED.password_hash;
 
--- Repartidores semilla (Ubicación centrada en zona urbana de prueba: e.g., 4.6097, -74.0817 o 10.4806, -66.9036)
+-- Repartidores semilla (Almacén Central: Cabudare Centro, Estado Lara: 10.0305, -69.2635)
 INSERT INTO drivers (id, user_id, vehicle_type, license_plate, current_lat, current_lng, is_available, status)
 VALUES
-    ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', '22222222-2222-2222-2222-222222222222', 'MOTORCYCLE', 'ABC-123', 4.6534, -74.0836, true, 'IDLE'),
-    ('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', '33333333-3333-3333-3333-333333333333', 'VAN', 'XYZ-789', 4.6480, -74.0620, true, 'IDLE')
-ON CONFLICT (user_id) DO NOTHING;
+    ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', '22222222-2222-2222-2222-222222222222', 'MOTORCYCLE', 'ABC-123', 10.0305, -69.2635, true, 'IDLE'),
+    ('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', '33333333-3333-3333-3333-333333333333', 'VAN', 'XYZ-789', 10.0320, -69.2610, true, 'IDLE')
+ON CONFLICT (user_id) DO UPDATE SET current_lat = EXCLUDED.current_lat, current_lng = EXCLUDED.current_lng;
 
--- Órdenes semilla
+-- Órdenes semilla (Cabudare y Barquisimeto, Estado Lara)
 INSERT INTO orders (id, tracking_number, client_name, client_phone, delivery_address, dest_lat, dest_lng, priority, status)
 VALUES
-    ('10000000-0000-0000-0000-000000000001', 'TRK-2026-001', 'Farmacia San Rafael', '+573001234567', 'Calle 72 # 11-45', 4.6580, -74.0590, 'URGENT', 'PENDING'),
-    ('10000000-0000-0000-0000-000000000002', 'TRK-2026-002', 'Librería El Saber', '+573009876543', 'Carrera 15 # 85-30', 4.6710, -74.0560, 'NORMAL', 'PENDING'),
-    ('10000000-0000-0000-0000-000000000003', 'TRK-2026-003', 'Clínica Norte', '+573005556677', 'Calle 98 # 21-14', 4.6850, -74.0520, 'URGENT', 'PENDING'),
-    ('10000000-0000-0000-0000-000000000004', 'TRK-2026-004', 'Restaurante Sabor Latino', '+573001112233', 'Carrera 7 # 60-20', 4.6460, -74.0630, 'NORMAL', 'PENDING')
-ON CONFLICT (tracking_number) DO NOTHING;
+    ('10000000-0000-0000-0000-000000000001', 'TRK-2026-001', 'Farmacia San Rafael', '+58 412 1234567', 'Av. La Mata c/ Calle 9, Cabudare', 10.0350, -69.2680, 'URGENT', 'PENDING'),
+    ('10000000-0000-0000-0000-000000000002', 'TRK-2026-002', 'Bodegón El Centro', '+58 414 9876543', 'Av. Intercomunal Cabudare-Barquisimeto, Sector La Mora', 10.0420, -69.2740, 'NORMAL', 'PENDING'),
+    ('10000000-0000-0000-0000-000000000003', 'TRK-2026-003', 'Centro Médico Valle Hondo', '+58 424 5556677', 'Urb. Valle Hondo, Calle 3, Cabudare', 10.0460, -69.2810, 'URGENT', 'PENDING'),
+    ('10000000-0000-0000-0000-000000000004', 'TRK-2026-004', 'Comercial Los Cardones', '+58 416 3334455', 'Av. Los Leones c/ Av. Lara, Barquisimeto Este', 10.0620, -69.2980, 'NORMAL', 'PENDING')
+ON CONFLICT (tracking_number) DO UPDATE SET dest_lat = EXCLUDED.dest_lat, dest_lng = EXCLUDED.dest_lng;

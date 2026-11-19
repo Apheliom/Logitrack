@@ -89,10 +89,10 @@ export const CustomerStorePage = () => {
   // Formulario del cliente con auto-completado si está autenticado
   const [customerData, setCustomerData] = useState({
     client_name: user?.full_name || '',
-    client_phone: user?.phone || '+57 312 456 7890',
-    delivery_address: 'Calle 72 # 11-45, Centro Financiero',
-    dest_lat: '4.6580',
-    dest_lng: '-74.0590',
+    client_phone: user?.phone || '+58 414 456 7890',
+    delivery_address: 'Av. La Mata c/ Calle 9, Cabudare Centro',
+    dest_lat: '10.0350',
+    dest_lng: '-69.2680',
     priority: 'NORMAL'
   });
 
@@ -420,24 +420,24 @@ export const CustomerStorePage = () => {
                 <div className="flex flex-wrap gap-1.5">
                   <button
                     type="button"
-                    onClick={() => setPresetAddress('Calle 72 # 11-45, Centro Financiero', 4.6580, -74.0590)}
+                    onClick={() => setPresetAddress('Av. La Mata c/ Calle 9, Cabudare Centro', 10.0350, -69.2680)}
                     className="px-2 py-1 text-[11px] bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg border border-slate-200 transition"
                   >
-                    Calle 72
+                    Av. La Mata
                   </button>
                   <button
                     type="button"
-                    onClick={() => setPresetAddress('Carrera 15 # 93-60, Parque 93', 4.6750, -74.0550)}
+                    onClick={() => setPresetAddress('Av. Intercomunal Cabudare-Barquisimeto, Sector La Mora', 10.0420, -69.2740)}
                     className="px-2 py-1 text-[11px] bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg border border-slate-200 transition"
                   >
-                    Parque 93
+                    Av. Intercomunal
                   </button>
                   <button
                     type="button"
-                    onClick={() => setPresetAddress('Carrera 7 # 60-20, Chapinero', 4.6460, -74.0630)}
+                    onClick={() => setPresetAddress('Urb. Valle Hondo, Calle 3, Cabudare', 10.0460, -69.2810)}
                     className="px-2 py-1 text-[11px] bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg border border-slate-200 transition"
                   >
-                    Chapinero
+                    Valle Hondo
                   </button>
                 </div>
               </div>
