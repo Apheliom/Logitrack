@@ -2,7 +2,7 @@ import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useSocket } from '../context/SocketContext';
-import { Truck, LogOut, Radio, Package, Navigation, UserCheck } from 'lucide-react';
+import { Truck, LogOut, Radio, Package, Navigation, LayoutDashboard } from 'lucide-react';
 
 export const Navbar = () => {
   const { user, logout } = useAuth();
@@ -13,103 +13,72 @@ export const Navbar = () => {
 
   const isActive = (path) => location.pathname === path;
 
+  const NavLink = ({ to, icon: Icon, label }) => (
+    <Link
+      to={to}
+      className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
+        isActive(to)
+          ? 'bg-brand-50 text-brand-600'
+          : 'text-ink-secondary hover:text-ink-primary hover:bg-surface-2'
+      }`}
+    >
+      <Icon className="w-4 h-4" strokeWidth={1.75} />
+      <span>{label}</span>
+    </Link>
+  );
+
   return (
-    <header className="bg-slate-900 border-b border-slate-800 sticky top-0 z-50 px-4 lg:px-8 py-3">
-      <div className="max-w-7xl mx-auto flex items-center justify-between">
-        
+    <header className="bg-white border-b border-surface-3 sticky top-0 z-50 h-14">
+      <div className="max-w-screen-xl mx-auto px-5 h-full flex items-center justify-between gap-6">
+
         {/* Brand */}
-        <div className="flex items-center gap-3">
-          <div className="bg-emerald-500/10 border border-emerald-500/30 p-2 rounded-lg text-emerald-400">
-            <Truck className="w-5 h-5" />
+        <div className="flex items-center gap-2.5 shrink-0">
+          <div className="w-7 h-7 rounded-lg bg-brand-600 flex items-center justify-center">
+            <Truck className="w-4 h-4 text-white" strokeWidth={2} />
           </div>
-          <div>
-            <span className="font-bold text-lg text-white tracking-wide">LogiTrack</span>
-            <span className="hidden sm:inline-block text-xs text-slate-400 ml-2 border-l border-slate-700 pl-2">
-              Sistemas 7mo
-            </span>
-          </div>
+          <span className="font-semibold text-ink-primary tracking-tight">LogiTrack</span>
         </div>
 
-        {/* Navigation Links based on Role */}
-        <nav className="flex items-center gap-2">
+        {/* Navigation */}
+        <nav className="flex items-center gap-1">
           {user.role === 'ADMIN' && (
-            <>
-              <Link
-                to="/admin"
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition ${
-                  isActive('/admin')
-                    ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30'
-                    : 'text-slate-300 hover:text-white hover:bg-slate-800'
-                }`}
-              >
-                <Package className="w-4 h-4" />
-                <span>Despacho y Mapa</span>
-              </Link>
-            </>
+            <NavLink to="/admin" icon={LayoutDashboard} label="Centro de Despacho" />
           )}
-
           {(user.role === 'ADMIN' || user.role === 'DRIVER') && (
-            <Link
-              to="/driver"
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition ${
-                isActive('/driver')
-                  ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30'
-                  : 'text-slate-300 hover:text-white hover:bg-slate-800'
-              }`}
-            >
-              <Navigation className="w-4 h-4" />
-              <span>Vista Repartidor</span>
-            </Link>
+            <NavLink to="/driver" icon={Navigation} label="Vista Repartidor" />
           )}
-
-          <Link
-            to="/track/TRK-2026-001"
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition ${
-              location.pathname.startsWith('/track')
-                ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30'
-                : 'text-slate-300 hover:text-white hover:bg-slate-800'
-            }`}
-          >
-            <Radio className="w-4 h-4" />
-            <span>Tracking Demo</span>
-          </Link>
+          <NavLink to="/track/TRK-2026-001" icon={Package} label="Rastreo" />
         </nav>
 
-        {/* Right side: Telemetry Status + User Info + Logout */}
-        <div className="flex items-center gap-3">
-          {/* Socket Indicator */}
+        {/* Right side */}
+        <div className="flex items-center gap-3 shrink-0">
+          {/* Telemetry dot */}
           <div
-            className={`hidden md:flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border ${
-              isConnected
-                ? 'bg-emerald-950/40 text-emerald-400 border-emerald-800/50'
-                : 'bg-rose-950/40 text-rose-400 border-rose-800/50'
+            className={`hidden sm:flex items-center gap-1.5 text-xs font-medium ${
+              isConnected ? 'text-status-success' : 'text-status-danger'
             }`}
-            title={isConnected ? 'Conectado a telemetría WebSockets' : 'Desconectado'}
           >
-            <span
-              className={`w-2 h-2 rounded-full ${
-                isConnected ? 'bg-emerald-400 animate-pulse' : 'bg-rose-400'
-              }`}
-            />
-            <span>{isConnected ? 'GPS En Vivo' : 'Offline'}</span>
+            <span className={`w-1.5 h-1.5 rounded-full ${isConnected ? 'bg-status-success animate-pulse' : 'bg-status-danger'}`} />
+            <span>{isConnected ? 'En vivo' : 'Offline'}</span>
           </div>
 
-          {/* User Badge */}
-          <div className="flex items-center gap-2 pl-2 border-l border-slate-800 text-left">
-            <div className="hidden sm:block">
-              <div className="text-xs font-semibold text-slate-200 truncate max-w-[120px]">
+          {/* Divider */}
+          <div className="hidden sm:block w-px h-5 bg-surface-3" />
+
+          {/* User */}
+          <div className="flex items-center gap-2.5">
+            <div className="hidden sm:block text-right">
+              <div className="text-xs font-semibold text-ink-primary leading-tight truncate max-w-[130px]">
                 {user.full_name}
               </div>
-              <span className="text-[10px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded bg-slate-800 text-slate-400">
-                {user.role}
-              </span>
+              <div className="text-[11px] text-ink-tertiary">{user.role}</div>
             </div>
             <button
               onClick={logout}
-              className="p-1.5 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-rose-950/30 transition"
+              className="p-1.5 rounded-lg text-ink-tertiary hover:text-status-danger hover:bg-red-50 transition-colors"
               title="Cerrar sesión"
             >
-              <LogOut className="w-4 h-4" />
+              <LogOut className="w-4 h-4" strokeWidth={1.75} />
             </button>
           </div>
         </div>

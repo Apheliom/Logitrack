@@ -4,337 +4,207 @@ import { useSocket } from '../context/SocketContext';
 import { LiveFleetMap } from '../components/Map/LiveFleetMap';
 import { CreateOrderModal } from '../components/Orders/CreateOrderModal';
 import {
-  Package,
-  Truck,
-  CheckCircle2,
-  Clock,
-  Play,
-  Square,
-  Zap,
-  Plus,
-  RefreshCw,
-  Search,
-  Filter
+  Package, Truck, CheckCircle2, Clock, Play, Square,
+  Zap, Plus, RefreshCw, ArrowUpRight
 } from 'lucide-react';
 
+// --- Sub-components ---
+
+const StatCard = ({ label, value, icon: Icon, color = 'text-ink-primary' }) => (
+  <div className="bg-white border border-surface-3 rounded-2xl p-5 shadow-card">
+    <div className="flex items-center justify-between mb-3">
+      <span className="text-xs font-medium text-ink-tertiary">{label}</span>
+      <div className="p-1.5 rounded-lg bg-surface-2">
+        <Icon className="w-3.5 h-3.5 text-ink-tertiary" strokeWidth={1.75} />
+      </div>
+    </div>
+    <div className={`text-2xl font-bold tabular-nums tracking-tight ${color}`}>{value}</div>
+  </div>
+);
+
+const StatusBadge = ({ status }) => {
+  const map = {
+    PENDING:    { label: 'Pendiente',    className: 'bg-amber-50 text-amber-700 border-amber-200' },
+    ASSIGNED:   { label: 'Asignado',     className: 'bg-blue-50 text-blue-700 border-blue-200' },
+    IN_TRANSIT: { label: 'En tránsito',  className: 'bg-violet-50 text-violet-700 border-violet-200' },
+    DELIVERED:  { label: 'Entregado',    className: 'bg-green-50 text-green-700 border-green-200' },
+    FAILED:     { label: 'Fallido',      className: 'bg-red-50 text-red-700 border-red-200' },
+  };
+  const cfg = map[status] || { label: status, className: 'bg-surface-2 text-ink-tertiary border-surface-3' };
+  return (
+    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold border ${cfg.className}`}>
+      {cfg.label}
+    </span>
+  );
+};
+
+const PriorityBadge = ({ priority }) => {
+  if (priority === 'URGENT') return (
+    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-red-50 text-red-700 border border-red-200">Urgente</span>
+  );
+  return (
+    <span className="text-[11px] text-ink-disabled font-medium">{priority === 'LOW' ? 'Baja' : 'Normal'}</span>
+  );
+};
+
 export const AdminDashboard = () => {
-  const [orders, setOrders] = useState([]);
+  const [orders,  setOrders]  = useState([]);
   const [drivers, setDrivers] = useState([]);
   const [activeRoute, setActiveRoute] = useState(null);
-  const [simulatorStatus, setSimulatorStatus] = useState({ isRunning: false });
+  const [simRunning, setSimRunning] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [selectedDriverForRoute, setSelectedDriverForRoute] = useState('');
+  const [modalOpen, setModalOpen] = useState(false);
+  const [selDriver, setSelDriver] = useState('');
   const [filterStatus, setFilterStatus] = useState('ALL');
   const [optimizing, setOptimizing] = useState(false);
-  const [optimizationMsg, setOptimizationMsg] = useState(null);
-
+  const [optMsg, setOptMsg] = useState('');
   const { socket } = useSocket();
 
-  // Carga paralela de datos (Eliminación de Waterfalls según .agent-skills)
-  const loadDashboardData = async () => {
+  const loadAll = async () => {
     try {
       setLoading(true);
-      const [ordersRes, driversRes, routesRes, simRes] = await Promise.all([
+      const [oRes, dRes, rRes, sRes] = await Promise.all([
         api.get('/orders'),
         api.get('/drivers'),
         api.get('/routes/active'),
-        api.get('/routes/simulator/status')
+        api.get('/routes/simulator/status'),
       ]);
-
-      if (ordersRes.success) setOrders(ordersRes.orders || []);
-      if (driversRes.success) {
-        setDrivers(driversRes.drivers || []);
-        if (driversRes.drivers.length > 0 && !selectedDriverForRoute) {
-          setSelectedDriverForRoute(driversRes.drivers[0].id);
-        }
+      if (oRes.success) setOrders(oRes.orders || []);
+      if (dRes.success) {
+        setDrivers(dRes.drivers || []);
+        if (!selDriver && dRes.drivers.length) setSelDriver(dRes.drivers[0].id);
       }
-      if (routesRes.success && routesRes.routes.length > 0) {
-        setActiveRoute(routesRes.routes[0]);
-      }
-      if (simRes.success) setSimulatorStatus(simRes.simulator);
-    } catch (err) {
-      console.error('[AdminDashboard] Error al cargar datos:', err);
-    } finally {
-      setLoading(false);
-    }
+      if (rRes.success && rRes.routes.length) setActiveRoute(rRes.routes[0]);
+      if (sRes.success) setSimRunning(sRes.simulator.isRunning);
+    } catch (e) { console.error(e); }
+    finally { setLoading(false); }
   };
 
   useEffect(() => {
-    loadDashboardData();
-
-    // Suscripción a eventos de socket para actualización en tiempo real
+    loadAll();
     if (socket) {
-      socket.on('order:created', (newOrder) => {
-        setOrders((prev) => [newOrder, ...prev]);
-      });
-
-      socket.on('order:updated', (updatedOrder) => {
-        setOrders((prev) =>
-          prev.map((ord) => (ord.id === updatedOrder.id ? { ...ord, ...updatedOrder } : ord))
-        );
-      });
-
-      socket.on('route:generated', ({ route }) => {
-        setActiveRoute(route);
-      });
+      socket.on('order:created',  o => setOrders(p => [o, ...p]));
+      socket.on('order:updated',  o => setOrders(p => p.map(x => x.id === o.id ? { ...x, ...o } : x)));
+      socket.on('route:generated', ({ route }) => setActiveRoute(route));
     }
-
-    return () => {
-      if (socket) {
-        socket.off('order:created');
-        socket.off('order:updated');
-        socket.off('route:generated');
-      }
-    };
+    return () => { if (socket) { socket.off('order:created'); socket.off('order:updated'); socket.off('route:generated'); } };
   }, [socket]);
 
-  // Manejo del simulador GPS
-  const handleToggleSimulator = async () => {
-    try {
-      const res = await api.post('/routes/simulator/toggle', {
-        action: simulatorStatus.isRunning ? 'stop' : 'start'
-      });
-      if (res.success) {
-        setSimulatorStatus(res.simulator);
-      }
-    } catch (err) {
-      alert('Error al controlar simulador: ' + err.message);
-    }
+  const toggleSim = async () => {
+    const r = await api.post('/routes/simulator/toggle', { action: simRunning ? 'stop' : 'start' });
+    if (r.success) setSimRunning(r.simulator.isRunning);
   };
 
-  // Ejecutar optimización de ruta con algoritmo 2-opt
-  const handleOptimizeRoute = async () => {
-    if (!selectedDriverForRoute) {
-      alert('Seleccione un repartidor para generar la ruta optimizada.');
-      return;
-    }
-    setOptimizing(true);
-    setOptimizationMsg(null);
+  const handleOptimize = async () => {
+    if (!selDriver) return;
+    setOptimizing(true); setOptMsg('');
     try {
-      const res = await api.post('/routes/optimize', {
-        driver_id: selectedDriverForRoute
-      });
-      if (res.success) {
-        setActiveRoute(res.route);
-        setOptimizationMsg(`Ruta optimizada: ${res.summary.totalDistanceKm} km (~${res.summary.estimatedDurationMinutes} min)`);
-        loadDashboardData();
-      }
-    } catch (err) {
-      setOptimizationMsg(`Fallo: ${err.message}`);
-    } finally {
-      setOptimizing(false);
-    }
+      const r = await api.post('/routes/optimize', { driver_id: selDriver });
+      if (r.success) { setActiveRoute(r.route); setOptMsg(`Ruta óptima: ${r.summary.totalDistanceKm} km · ~${r.summary.estimatedDurationMinutes} min`); loadAll(); }
+    } catch (e) { setOptMsg(`Error: ${e.message}`); }
+    finally { setOptimizing(false); }
   };
 
-  // Métricas calculadas
   const metrics = {
-    total: orders.length,
-    pending: orders.filter((o) => o.status === 'PENDING').length,
-    inTransit: orders.filter((o) => o.status === 'IN_TRANSIT').length,
-    delivered: orders.filter((o) => o.status === 'DELIVERED').length,
-    availableDrivers: drivers.filter((d) => d.is_available).length
+    total:     orders.length,
+    pending:   orders.filter(o => o.status === 'PENDING').length,
+    transit:   orders.filter(o => o.status === 'IN_TRANSIT').length,
+    delivered: orders.filter(o => o.status === 'DELIVERED').length,
   };
 
-  const filteredOrders = orders.filter((o) => {
-    if (filterStatus === 'ALL') return true;
-    return o.status === filterStatus;
-  });
+  const filtered = orders.filter(o => filterStatus === 'ALL' || o.status === filterStatus);
 
   return (
-    <div className="max-w-7xl mx-auto px-4 lg:px-8 py-6 space-y-6">
-      
-      {/* Top Banner & Control Actions */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-slate-900 border border-slate-800 p-5 rounded-2xl shadow-xl">
+    <div className="max-w-screen-xl mx-auto px-5 py-6 space-y-6">
+
+      {/* Page header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-xl font-bold text-white flex items-center gap-2">
-            <span>Centro de Despacho y Telemetría</span>
-            <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-950 text-emerald-400 border border-emerald-800">
-              En Vivo
-            </span>
-          </h1>
-          <p className="text-xs text-slate-400 mt-1">
-            Optimización de rutas con algoritmo 2-opt (TSP) y monitoreo de flota en tiempo real.
-          </p>
+          <h1 className="text-xl font-bold text-ink-primary tracking-tight">Centro de Despacho</h1>
+          <p className="text-sm text-ink-tertiary mt-0.5">Monitoreo en tiempo real · Optimización 2-opt</p>
         </div>
-
-        {/* Action Buttons */}
-        <div className="flex flex-wrap items-center gap-2.5">
-          {/* Botón Simulador GPS (Clave para demostración académica) */}
-          <button
-            onClick={handleToggleSimulator}
-            className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold border transition shadow-lg ${
-              simulatorStatus.isRunning
-                ? 'bg-rose-950/60 border-rose-700 text-rose-300 hover:bg-rose-900/60'
-                : 'bg-indigo-950/60 border-indigo-700 text-indigo-300 hover:bg-indigo-900/60'
-            }`}
-            title="Simula movimiento de repartidores en las calles sin GPS real"
-          >
-            {simulatorStatus.isRunning ? (
-              <>
-                <Square className="w-3.5 h-3.5 text-rose-400 fill-rose-400" />
-                <span>Detener Simulación GPS</span>
-              </>
-            ) : (
-              <>
-                <Play className="w-3.5 h-3.5 text-indigo-400 fill-indigo-400" />
-                <span>Activar Simulación GPS</span>
-              </>
-            )}
+        <div className="flex items-center gap-2">
+          <button onClick={toggleSim} className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-sm font-medium border transition ${simRunning ? 'bg-red-50 border-red-200 text-red-700 hover:bg-red-100' : 'bg-white border-surface-3 text-ink-secondary hover:bg-surface-2'}`}>
+            {simRunning ? <><Square className="w-3.5 h-3.5 fill-current" /> Detener simulación</> : <><Play className="w-3.5 h-3.5 fill-current" /> Simular GPS</>}
           </button>
-
-          {/* Botón Crear Orden */}
-          <button
-            onClick={() => setIsModalOpen(true)}
-            className="flex items-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold shadow-lg shadow-emerald-950 transition"
-          >
-            <Plus className="w-4 h-4" />
-            <span>Nueva Entrega</span>
+          <button onClick={() => setModalOpen(true)} className="flex items-center gap-1.5 px-3.5 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-sm font-medium shadow-sm transition">
+            <Plus className="w-4 h-4" strokeWidth={2} />
+            Nueva entrega
           </button>
-
-          {/* Botón Refrescar */}
-          <button
-            onClick={loadDashboardData}
-            className="p-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl transition"
-            title="Recargar datos"
-          >
-            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+          <button onClick={loadAll} className={`p-2 rounded-xl border border-surface-3 bg-white hover:bg-surface-2 text-ink-tertiary transition ${loading ? 'animate-spin' : ''}`} title="Recargar">
+            <RefreshCw className="w-4 h-4" strokeWidth={1.75} />
           </button>
         </div>
       </div>
 
-      {/* KPI Cards */}
+      {/* Stat cards */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        <div className="bg-slate-900 border border-slate-800 p-4 rounded-xl">
-          <div className="flex items-center justify-between text-slate-400 text-xs font-medium">
-            <span>Órdenes Totales</span>
-            <Package className="w-4 h-4 text-slate-500" />
-          </div>
-          <div className="text-2xl font-bold text-white mt-1">{metrics.total}</div>
-        </div>
-
-        <div className="bg-slate-900 border border-slate-800 p-4 rounded-xl">
-          <div className="flex items-center justify-between text-amber-400 text-xs font-medium">
-            <span>Pendientes</span>
-            <Clock className="w-4 h-4 text-amber-500" />
-          </div>
-          <div className="text-2xl font-bold text-amber-300 mt-1">{metrics.pending}</div>
-        </div>
-
-        <div className="bg-slate-900 border border-slate-800 p-4 rounded-xl">
-          <div className="flex items-center justify-between text-purple-400 text-xs font-medium">
-            <span>En Tránsito</span>
-            <Truck className="w-4 h-4 text-purple-500" />
-          </div>
-          <div className="text-2xl font-bold text-purple-300 mt-1">{metrics.inTransit}</div>
-        </div>
-
-        <div className="bg-slate-900 border border-slate-800 p-4 rounded-xl">
-          <div className="flex items-center justify-between text-emerald-400 text-xs font-medium">
-            <span>Entregados</span>
-            <CheckCircle2 className="w-4 h-4 text-emerald-500" />
-          </div>
-          <div className="text-2xl font-bold text-emerald-300 mt-1">{metrics.delivered}</div>
-        </div>
+        <StatCard label="Total órdenes"  value={metrics.total}     icon={Package}     />
+        <StatCard label="Pendientes"     value={metrics.pending}   icon={Clock}       color="text-amber-600" />
+        <StatCard label="En tránsito"    value={metrics.transit}   icon={Truck}       color="text-violet-600" />
+        <StatCard label="Entregadas"     value={metrics.delivered} icon={CheckCircle2} color="text-status-success" />
       </div>
 
-      {/* Main Content: Map & Route Optimization Section */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        
-        {/* Left 2 Cols: Live Leaflet Map */}
-        <div className="lg:col-span-2 space-y-3">
-          <div className="flex items-center justify-between">
-            <h2 className="text-sm font-bold text-slate-200 flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
-              <span>Mapa de Telemetría y Rutas de Flota</span>
-            </h2>
-            <div className="text-xs text-slate-400">
-              {drivers.length} Vehículos monitoreados
-            </div>
-          </div>
+      {/* Map + Route optimizer */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
 
-          <LiveFleetMap
-            orders={orders}
-            drivers={drivers}
-            activeRoute={activeRoute}
-            center={[4.6534, -74.0836]}
-            zoom={13}
-          />
+        {/* Map */}
+        <div className="lg:col-span-2 space-y-2">
+          <div className="flex items-center justify-between">
+            <h2 className="text-sm font-semibold text-ink-primary flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-status-success animate-pulse" />
+              Mapa de flota en tiempo real
+            </h2>
+            <span className="text-xs text-ink-tertiary">{drivers.length} vehículos monitoreados</span>
+          </div>
+          <LiveFleetMap orders={orders} drivers={drivers} activeRoute={activeRoute} center={[4.6534, -74.0836]} zoom={13} />
         </div>
 
-        {/* Right Col: Route Optimization Box & Driver Status */}
+        {/* Right column */}
         <div className="space-y-4">
-          
-          {/* Route Optimization Card */}
-          <div className="bg-slate-900 border border-slate-800 p-5 rounded-2xl shadow-xl space-y-4">
-            <div className="flex items-center gap-2 text-indigo-400 font-bold text-sm">
-              <Zap className="w-4 h-4" />
-              <span>Motor de Optimización (2-opt)</span>
-            </div>
-            <p className="text-xs text-slate-400">
-              Calcula el orden óptimo de paradas para minimizar distancia recorrida y tiempo de entrega.
-            </p>
 
+          {/* Route optimizer card */}
+          <div className="bg-white border border-surface-3 rounded-2xl p-5 shadow-card space-y-4">
             <div>
-              <label className="block text-xs font-medium text-slate-300 mb-1">
-                Seleccionar Conductor:
-              </label>
+              <div className="flex items-center gap-2 mb-0.5">
+                <Zap className="w-4 h-4 text-brand-600" strokeWidth={2} />
+                <h3 className="text-sm font-semibold text-ink-primary">Optimizador de ruta</h3>
+              </div>
+              <p className="text-xs text-ink-tertiary">Algoritmo 2-opt heurístico sobre distancias de Haversine.</p>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-ink-secondary">Conductor</label>
               <select
-                className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-white text-xs focus:outline-none focus:border-indigo-500"
-                value={selectedDriverForRoute}
-                onChange={(e) => setSelectedDriverForRoute(e.target.value)}
+                className="w-full px-3 py-2 bg-surface-1 border border-surface-3 rounded-xl text-sm text-ink-primary focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500 transition"
+                value={selDriver} onChange={e => setSelDriver(e.target.value)}
               >
-                {drivers.map((d) => (
-                  <option key={d.id} value={d.id}>
-                    {d.full_name} ({d.vehicle_type} - {d.status})
-                  </option>
-                ))}
+                {drivers.map(d => <option key={d.id} value={d.id}>{d.full_name} · {d.vehicle_type}</option>)}
               </select>
             </div>
 
-            <button
-              onClick={handleOptimizeRoute}
-              disabled={optimizing}
-              className="w-full py-2.5 px-4 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs rounded-xl shadow-lg shadow-indigo-950 flex items-center justify-center gap-2 transition disabled:opacity-50"
+            <button onClick={handleOptimize} disabled={optimizing}
+              className="w-full flex items-center justify-center gap-2 py-2.5 bg-brand-600 hover:bg-brand-700 disabled:opacity-60 text-white font-semibold text-sm rounded-xl transition-colors shadow-sm"
             >
-              <Zap className="w-4 h-4" />
-              <span>{optimizing ? 'Calculando 2-opt...' : 'Calcular Ruta Óptima'}</span>
+              <Zap className="w-4 h-4" strokeWidth={2} />
+              {optimizing ? 'Calculando…' : 'Calcular ruta óptima'}
             </button>
 
-            {optimizationMsg && (
-              <div className="p-3 bg-slate-800/80 border border-slate-700 rounded-xl text-xs text-indigo-300">
-                {optimizationMsg}
-              </div>
-            )}
+            {optMsg && <p className="text-xs text-ink-secondary bg-surface-1 border border-surface-3 rounded-xl px-3 py-2">{optMsg}</p>}
           </div>
 
-          {/* Drivers List Card */}
-          <div className="bg-slate-900 border border-slate-800 p-5 rounded-2xl shadow-xl">
-            <h3 className="text-xs font-bold text-slate-200 uppercase tracking-wider mb-3">
-              Estado de Repartidores
-            </h3>
-            <div className="space-y-2.5 max-h-[220px] overflow-y-auto pr-1">
-              {drivers.map((driver) => (
-                <div
-                  key={driver.id}
-                  className="flex items-center justify-between p-2.5 rounded-xl bg-slate-800/50 border border-slate-700/60 text-xs"
-                >
-                  <div>
-                    <div className="font-semibold text-white">{driver.full_name}</div>
-                    <div className="text-[10px] text-slate-400">
-                      {driver.vehicle_type} • Placa: {driver.license_plate}
-                    </div>
+          {/* Drivers status */}
+          <div className="bg-white border border-surface-3 rounded-2xl p-5 shadow-card">
+            <h3 className="text-sm font-semibold text-ink-primary mb-3">Estado de repartidores</h3>
+            <div className="space-y-2.5 max-h-56 overflow-y-auto pr-1">
+              {drivers.map(d => (
+                <div key={d.id} className="flex items-center justify-between gap-3 p-3 rounded-xl bg-surface-1 border border-surface-3">
+                  <div className="min-w-0">
+                    <div className="text-sm font-medium text-ink-primary truncate">{d.full_name}</div>
+                    <div className="text-xs text-ink-tertiary">{d.vehicle_type} · {d.license_plate}</div>
                   </div>
-                  <span
-                    className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                      driver.status === 'ON_DELIVERY'
-                        ? 'bg-purple-950 text-purple-300 border border-purple-800'
-                        : driver.status === 'IDLE'
-                        ? 'bg-emerald-950 text-emerald-300 border border-emerald-800'
-                        : 'bg-slate-800 text-slate-400'
-                    }`}
-                  >
-                    {driver.status}
+                  <span className={`shrink-0 text-[10px] font-bold px-2 py-0.5 rounded-full border ${d.status === 'ON_DELIVERY' ? 'bg-violet-50 text-violet-700 border-violet-200' : 'bg-green-50 text-green-700 border-green-200'}`}>
+                    {d.status === 'ON_DELIVERY' ? 'En ruta' : 'Libre'}
                   </span>
                 </div>
               ))}
@@ -342,123 +212,66 @@ export const AdminDashboard = () => {
           </div>
 
         </div>
-
       </div>
 
-      {/* Orders Management Table */}
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
-        <div className="p-4 border-b border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-3">
-          <div className="flex items-center gap-2">
-            <Package className="w-5 h-5 text-emerald-400" />
-            <h3 className="text-sm font-bold text-white">Listado de Órdenes y Entregas</h3>
-          </div>
-
-          {/* Filter Tabs */}
-          <div className="flex items-center gap-1.5 bg-slate-800/60 p-1 rounded-xl text-xs">
-            {['ALL', 'PENDING', 'IN_TRANSIT', 'DELIVERED'].map((st) => (
-              <button
-                key={st}
-                onClick={() => setFilterStatus(st)}
-                className={`px-3 py-1 rounded-lg font-medium transition ${
-                  filterStatus === st
-                    ? 'bg-emerald-600 text-white shadow'
-                    : 'text-slate-400 hover:text-white'
-                }`}
+      {/* Orders table */}
+      <div className="bg-white border border-surface-3 rounded-2xl shadow-card overflow-hidden">
+        <div className="px-5 py-4 border-b border-surface-3 flex flex-col sm:flex-row items-center justify-between gap-3">
+          <h3 className="text-sm font-semibold text-ink-primary flex items-center gap-2">
+            <Package className="w-4 h-4 text-ink-tertiary" strokeWidth={1.75} />
+            Órdenes de entrega
+          </h3>
+          {/* Filter tabs */}
+          <div className="flex items-center gap-1 bg-surface-1 border border-surface-3 p-0.5 rounded-xl text-xs">
+            {['ALL', 'PENDING', 'IN_TRANSIT', 'DELIVERED'].map(s => (
+              <button key={s} onClick={() => setFilterStatus(s)}
+                className={`px-3 py-1.5 rounded-lg font-medium transition ${filterStatus === s ? 'bg-white shadow-sm text-ink-primary' : 'text-ink-tertiary hover:text-ink-primary'}`}
               >
-                {st === 'ALL' ? 'Todos' : st}
+                {s === 'ALL' ? 'Todos' : s === 'IN_TRANSIT' ? 'En tránsito' : s === 'DELIVERED' ? 'Entregados' : 'Pendientes'}
               </button>
             ))}
           </div>
         </div>
 
-        {/* Table */}
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs text-slate-300">
-            <thead className="bg-slate-950/60 text-slate-400 uppercase text-[10px] tracking-wider border-b border-slate-800">
+          <table className="w-full text-left text-sm">
+            <thead className="bg-surface-1 border-b border-surface-3 text-xs font-semibold text-ink-tertiary uppercase tracking-wide">
               <tr>
-                <th className="px-4 py-3">Tracking</th>
-                <th className="px-4 py-3">Cliente</th>
-                <th className="px-4 py-3">Dirección</th>
-                <th className="px-4 py-3">Prioridad</th>
-                <th className="px-4 py-3">Repartidor</th>
-                <th className="px-4 py-3">Estado</th>
-                <th className="px-4 py-3 text-right">Rastreo</th>
+                <th className="px-5 py-3">Tracking</th>
+                <th className="px-5 py-3">Cliente</th>
+                <th className="px-5 py-3 hidden md:table-cell">Dirección</th>
+                <th className="px-5 py-3">Prioridad</th>
+                <th className="px-5 py-3 hidden sm:table-cell">Repartidor</th>
+                <th className="px-5 py-3">Estado</th>
+                <th className="px-5 py-3 text-right">Rastreo</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-800/60">
-              {filteredOrders.length === 0 ? (
-                <tr>
-                  <td colSpan="7" className="px-4 py-8 text-center text-slate-500">
-                    No se encontraron órdenes para este filtro.
+            <tbody className="divide-y divide-surface-3">
+              {filtered.length === 0 ? (
+                <tr><td colSpan={7} className="px-5 py-10 text-center text-sm text-ink-disabled">No hay órdenes para este filtro.</td></tr>
+              ) : filtered.map(o => (
+                <tr key={o.id} className="hover:bg-surface-1 transition-colors">
+                  <td className="px-5 py-3.5 font-mono text-xs font-semibold text-brand-600">{o.tracking_number}</td>
+                  <td className="px-5 py-3.5 font-medium text-ink-primary">{o.client_name}</td>
+                  <td className="px-5 py-3.5 text-ink-tertiary text-xs hidden md:table-cell max-w-[200px] truncate">{o.delivery_address}</td>
+                  <td className="px-5 py-3.5"><PriorityBadge priority={o.priority} /></td>
+                  <td className="px-5 py-3.5 text-sm text-ink-secondary hidden sm:table-cell">{o.driver_name || <span className="text-ink-disabled">—</span>}</td>
+                  <td className="px-5 py-3.5"><StatusBadge status={o.status} /></td>
+                  <td className="px-5 py-3.5 text-right">
+                    <a href={`/track/${o.tracking_number}`} target="_blank" rel="noreferrer"
+                      className="inline-flex items-center gap-1 text-xs font-medium text-brand-600 hover:text-brand-700 hover:underline"
+                    >
+                      Ver <ArrowUpRight className="w-3 h-3" strokeWidth={2} />
+                    </a>
                   </td>
                 </tr>
-              ) : (
-                filteredOrders.map((order) => (
-                  <tr key={order.id} className="hover:bg-slate-800/30 transition">
-                    <td className="px-4 py-3 font-mono font-bold text-emerald-400">
-                      {order.tracking_number}
-                    </td>
-                    <td className="px-4 py-3 font-medium text-white">{order.client_name}</td>
-                    <td className="px-4 py-3 text-slate-400 truncate max-w-xs">
-                      {order.delivery_address}
-                    </td>
-                    <td className="px-4 py-3">
-                      <span
-                        className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                          order.priority === 'URGENT'
-                            ? 'bg-rose-950/60 text-rose-300 border border-rose-800'
-                            : 'bg-slate-800 text-slate-300'
-                        }`}
-                      >
-                        {order.priority}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-slate-300">
-                      {order.driver_name || (
-                        <span className="text-slate-500 italic">No asignado</span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3">
-                      <span
-                        className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                          order.status === 'DELIVERED'
-                            ? 'bg-emerald-950 text-emerald-300 border border-emerald-800'
-                            : order.status === 'IN_TRANSIT'
-                            ? 'bg-purple-950 text-purple-300 border border-purple-800'
-                            : 'bg-amber-950 text-amber-300 border border-amber-800'
-                        }`}
-                      >
-                        {order.status}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-right">
-                      <a
-                        href={`/track/${order.tracking_number}`}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="text-indigo-400 hover:text-indigo-300 font-semibold hover:underline"
-                      >
-                        Ver Tracking →
-                      </a>
-                    </td>
-                  </tr>
-                ))
-              )}
+              ))}
             </tbody>
           </table>
         </div>
       </div>
 
-      {/* Modal Nueva Orden */}
-      <CreateOrderModal
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        onOrderCreated={(newOrder) => {
-          setOrders((prev) => [newOrder, ...prev]);
-        }}
-        drivers={drivers}
-      />
-
+      <CreateOrderModal isOpen={modalOpen} onClose={() => setModalOpen(false)} onOrderCreated={o => setOrders(p => [o, ...p])} drivers={drivers} />
     </div>
   );
 };
