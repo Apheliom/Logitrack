@@ -3,6 +3,7 @@ const multer = require('multer');
 const crypto = require('crypto');
 const ForensicService = require('../services/forensicService');
 const ImageForensicService = require('../services/imageForensicService');
+const AiForensicReportService = require('../services/aiForensicReportService');
 const AudioService = require('../services/audioService');
 const siemService = require('../services/siemService');
 const { insertAuditLog, getAuditLogById } = require('../db');
@@ -59,6 +60,69 @@ router.post('/analyze-file', memoryProtectionGuard, upload.single('file'), async
 
     // Ejecución del Nuevo Motor Forense de Imágenes Reconstruido desde Cero (IFIE v4.0)
     const analysisResult = await ImageForensicService.evaluateImageForensics(buffer, originalname, mimetype);
+
+    // Integración de Inteligencia Artificial Multimodal Pericial (Google Gemini Multimodal Vision)
+    const customApiKey = req.headers['x-gemini-api-key'] || req.body.geminiApiKey || process.env.GEMINI_API_KEY;
+    const aiReport = await AiForensicReportService.analyzeWithMultimodalAI(
+      buffer,
+      mimetype,
+      originalname,
+      customApiKey,
+      { sha256: analysisResult.hashes.sha256 }
+    );
+
+    // Si la IA emite un dictamen pericial con éxito, calibramos soberanamente el veredicto
+    if (aiReport && aiReport.status === 'SUCCESS' && aiReport.data) {
+      const aiData = aiReport.data;
+      analysisResult.aiPericial = aiData;
+
+      if (aiData.verdict === 'SINTETICO_TOTAL_IA') {
+        analysisResult.verdict = 'SINTETICO_IA_GENERATIVA';
+        analysisResult.riskScore = Math.max(analysisResult.riskScore, aiData.riesgo_porcentaje || 98.0);
+        analysisResult.confidence = aiData.confianza_pericial || 99.0;
+        if (aiData.anomalias_detectadas && Array.isArray(aiData.anomalias_detectadas)) {
+          aiData.anomalias_detectadas.forEach(a => {
+            if (!analysisResult.anomalies.includes(`[IA PERICIAL] ${a}`)) {
+              analysisResult.anomalies.push(`[IA PERICIAL] ${a}`);
+            }
+          });
+        }
+      } else if (aiData.verdict === 'FOTO_REAL_MANIPULADA_IA') {
+        analysisResult.verdict = 'FOTO_REAL_MANIPULADA_CON_IA';
+        analysisResult.riskScore = Math.max(analysisResult.riskScore, aiData.riesgo_porcentaje || 95.0);
+        analysisResult.confidence = aiData.confianza_pericial || 98.0;
+        if (aiData.anomalias_detectadas && Array.isArray(aiData.anomalias_detectadas)) {
+          aiData.anomalias_detectadas.forEach(a => {
+            if (!analysisResult.anomalies.includes(`[IA PERICIAL] ${a}`)) {
+              analysisResult.anomalies.push(`[IA PERICIAL] ${a}`);
+            }
+          });
+        }
+      } else if (aiData.verdict === 'COMPROBANTE_BANCARIO_ADULTERADO') {
+        analysisResult.verdict = 'COMPROBANTE_BANCARIO_ADULTERADO';
+        analysisResult.riskScore = Math.max(90.0, aiData.riesgo_porcentaje || 92.0);
+        analysisResult.confidence = aiData.confianza_pericial || 97.0;
+        if (aiData.anomalias_detectadas && Array.isArray(aiData.anomalias_detectadas)) {
+          aiData.anomalias_detectadas.forEach(a => {
+            analysisResult.anomalies.push(`[FRAUDE BANCARIO] ${a}`);
+          });
+        }
+      } else if (aiData.verdict === 'CAPTURA_INTERFAZ_LEGITIMA') {
+        // Validación concluyente de interfaz bancaria / pago móvil auténtico
+        analysisResult.verdict = 'CAPTURADEPANTALLA_DISPOSITIVO';
+        analysisResult.riskScore = Math.min(analysisResult.riskScore, 0.5);
+        analysisResult.confidence = aiData.confianza_pericial || 99.0;
+      } else if (aiData.verdict === 'FOTO_REAL_GENUINA') {
+        // Foto de cámara real (incluyendo Tecno u óptica directa)
+        analysisResult.verdict = analysisResult.verdict === 'TRANSITO_RED_SOCIAL_SANITIZADO' 
+          ? 'TRANSITO_RED_SOCIAL_SANITIZADO' 
+          : 'CAPTURA_OPTICA_GENUINA';
+        analysisResult.riskScore = Math.min(analysisResult.riskScore, 1.0);
+        analysisResult.confidence = aiData.confianza_pericial || 98.0;
+      }
+    } else {
+      analysisResult.aiPericial = aiReport;
+    }
 
     let liveGps = null;
     if (req.body.liveGps) {
@@ -498,6 +562,20 @@ router.get('/live-poll', (req, res) => {
   return res.json({
     success: true,
     hasNewEvidence: false
+  });
+});
+
+/**
+ * GET /api/forensics/ai-status
+ * Verifica si el motor pericial de IA tiene una clave activa configurada en el servidor
+ */
+router.get('/ai-status', (req, res) => {
+  const hasEnvKey = !!(process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY.trim() !== '');
+  return res.json({
+    success: true,
+    serverAiConfigured: hasEnvKey,
+    model: 'gemini-1.5-flash',
+    provider: 'Google Gemini Multimodal AI'
   });
 });
 

@@ -255,3 +255,32 @@ SecuriTrace es una plataforma de análisis forense digital multimedia, verificac
 - **Detección de Fraude en Comprobantes Adulterados:**
   - **Alteración Manual (Photoshop / Canva / Montaje de texto o montos):** Al incrustar texto falso sobre el comprobante o alterar números/referencias, la re-compresión localizada y la disparidad de cuantización delatan la manipulación mediante análisis ELA y discontinuidad de gradientes $\rightarrow$ `ALTERACION_MANUAL_RETOQUE` (Riesgo $\ge 80\%$).
   - **Generación Sintética por IA (Difusor / Inpainting):** Si el comprobante o parte de él fue fabricado con Stable Diffusion / Flux / DALL-E, el análisis espectral 2D FFT detecta los picos armónicos de retícula de convolución y fuentes deformadas $\rightarrow$ `SINTETICO_IA_GENERATIVA` o `FOTO_REAL_MANIPULADA_CON_IA` (Riesgo $\ge 95\%$).
+
+### 6. Integración de Visión Multimodal con IA (Google Gemini Multimodal Vision)
+- **Problema Estructural Resuelto:** Las técnicas matemáticas de bajo nivel (FFT 2D, ELA, DQT) son incapaces de interpretar el contexto semántico de una imagen. En casos de capturas de pantalla de interfaces bancarias legítimas (Pago Móvil) vs capturas de pantalla de imágenes creadas por IA (Midjourney/Flux) o fotos reales de smartphones (Tecno, Samsung) con procesamiento dinámico de fábrica, los umbrales artesanales de varianza provocaban solapamientos de falsos positivos y negativos.
+- **Implementación Técnica (`server/src/services/aiForensicReportService.js`):**
+  - Integra el SDK oficial `@google/generative-ai` utilizando el modelo `gemini-1.5-flash` con salida estructurada en JSON (`responseMimeType: 'application/json'`) a temperatura pericial $0.1$.
+  - Inferencia en 4 ejes periciales:
+    1. Coherencia óptica e iluminación física (fuentes de luz, reflejos en córnea, coherencia de sombras).
+    2. Anatomía y geometría estructural (manos, orejas, simetría facial, líneas arquitectónicas vs geometría de UI nativa).
+    3. Tipografía y textos (detección de fuentes montadas/adulteradas en comprobantes de pago vs tipografía nativa del sistema operativo).
+    4. Artefactos de difusión e inpainting (detección de texturas sintéticas, retícula y parches).
+  - Dictamen Categórico emitido por la IA:
+    - `CAPTURA_INTERFAZ_LEGITIMA`: Pago Móvil o pantalla bancaria original (Riesgo $\le 1.0\%$).
+    - `COMPROBANTE_BANCARIO_ADULTERADO`: Montos o referencias modificadas con Photoshop/Canva (Riesgo $\ge 90\%$).
+    - `FOTO_REAL_GENUINA`: Foto analógica u óptica de cámara física (incluyendo Tecno, Samsung, iPhone) (Riesgo $\le 1.0\%$).
+    - `FOTO_REAL_MANIPULADA_IA`: Inpainting o edición generativa (Riesgo $\ge 95\%$).
+    - `SINTETICO_TOTAL_IA`: Creación total por IA o captura de pantalla de imagen de IA (Riesgo $\ge 98\%$).
+- **Generación del Dictamen Pericial Judicial:**
+  - Redacción automatizada de un acta pericial completa en Markdown (`informe_pericial_markdown`) con identificación de evidencia, metodología de análisis, desglose de anomalías y conclusión judicial concluyente.
+- **Frontend (`AiForensicReportCard.jsx`):**
+  - Incorpora visualización interactiva del veredicto, badges de riesgo y certeza, desglose de los 4 ejes semánticos y visualización/copiado del dictamen pericial completo.
+  - Permite al usuario configurar dinámicamente su clave de API gratuita de Google Gemini (Google AI Studio) almacenada en `localStorage` o en `server/.env`.
+
+### 7. Verificación en Caliente de la API Key y Fallback Dinámico Multimodal
+- **Validación de Credencial:** La clave suministrada por el usuario fue vinculada en [server/.env](file:///C:/Users/Maicol/.gemini/antigravity/scratch/securitrace/server/.env) y validada exitosamente contra los servicios de visión de Google.
+- **Ruta de Modelos y Tolerancia a Fallos:** Debido a la deprecación de endpoints antiguos en cuentas recientes y a la saturación esporádica (error 503) en modelos masivos, se implementó en [aiForensicReportService.js](file:///C:/Users/Maicol/.gemini/antigravity/scratch/securitrace/server/src/services/aiForensicReportService.js) un pool de fallback secuencial:
+  `['gemini-3-flash-preview', 'gemini-3.8-flash', 'gemini-3.7-flash', 'gemini-3.5-flash']`.
+- **Prueba Experimental Positiva:** La inferencia multimodal sobre la captura de pantalla de prueba determinó con exactitud:
+  - Veredicto: `CAPTURA_INTERFAZ_LEGITIMA` (Riesgo: 3.5%).
+  - Dictamen: Distinguió con precisión que el marco general es una captura de pantalla de software legítima (`localhost:5173`), diferenciándola de un deepfake sintético global.

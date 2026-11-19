@@ -11,6 +11,7 @@ import { ProvenanceTimeline } from './common/ProvenanceTimeline';
 import ThreatRadarDeck from './common/ThreatRadarDeck';
 import ForensicGeoMap from './common/ForensicGeoMap';
 import PixelForensicViewer from './common/PixelForensicViewer';
+import AiForensicReportCard from './common/AiForensicReportCard';
 import { humanizeForensicText, humanizeForensicDate, humanizeTechnicalParam, humanizePredictiveCategory } from '../utils/forensicFormatter';
 
 export default function FileAnalyzer() {
@@ -106,8 +107,15 @@ export default function FileAnalyzer() {
         formData.append('liveGps', JSON.stringify(liveGps));
       }
 
+      const savedKey = localStorage.getItem('securitrace_gemini_key') || '';
+      const headers = {};
+      if (savedKey) {
+        headers['x-gemini-api-key'] = savedKey;
+      }
+
       const response = await fetch('/api/forensics/analyze-file', {
         method: 'POST',
+        headers,
         body: formData
       });
 
@@ -408,6 +416,12 @@ export default function FileAnalyzer() {
               <VerdictBadge
                 verdict={fileAnalysisResult.verdict}
                 riskScore={fileAnalysisResult.riskScore}
+              />
+
+              {/* Dictamen Pericial Judicial Multimodal con IA (Gemini Vision) */}
+              <AiForensicReportCard
+                aiPericial={fileAnalysisResult.aiPericial}
+                onReanalyzeWithKey={runAnalysis}
               />
 
               {/* Panel de Predicción & Diagnóstico Forense Avanzado (FCE v3.0) */}
