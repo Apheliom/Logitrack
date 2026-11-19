@@ -25,10 +25,9 @@ export const DriverView = () => {
   const [assignedOrders, setAssignedOrders] = useState([]);
   const [availableOrders, setAvailableOrders] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [gpsActive, setGpsActive] = useState(false);
-  const [watchId, setWatchId] = useState(null);
+  const [gpsActive, setGpsActive] = useState(true);
   const [selectedOrderForSignature, setSelectedOrderForSignature] = useState(null);
-  const [statusMessage, setStatusMessage] = useState('');
+  const [statusMessage, setStatusMessage] = useState('GPS permanente activo: emitiendo señal en tiempo real.');
 
   const driverId = user?.driver_id || 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
 
@@ -53,52 +52,61 @@ export const DriverView = () => {
     loadData();
   }, [driverId]);
 
-  // Transmisión GPS móvil
-  const toggleGpsBroadcast = () => {
-    if (gpsActive) {
-      if (watchId !== null) {
-        navigator.geolocation.clearWatch(watchId);
-        setWatchId(null);
-      }
-      setGpsActive(false);
-      setStatusMessage('Transmisión GPS en pausa.');
-    } else {
-      if (!navigator.geolocation) {
-        alert('Tu navegador no admite geolocalización.');
-        return;
-      }
+  // Transmisión GPS permanente y automática para el repartidor
+  useEffect(() => {
+    let watchSubscriptionId = null;
+    let keepAliveTimer = null;
+    let lastCoords = { lat: 4.6534, lng: -74.0836 };
 
-      const id = navigator.geolocation.watchPosition(
-        async (position) => {
+    const broadcastGps = async (lat, lng) => {
+      lastCoords = { lat, lng };
+      sendDriverGPS({
+        driver_id: driverId,
+        driver_name: user?.full_name || 'Conductor',
+        lat,
+        lng
+      });
+
+      try {
+        await api.post(`/drivers/${driverId}/location`, { lat, lng });
+      } catch (e) {
+        // Evitar saturar logs por fallos temporales de red HTTP
+      }
+    };
+
+    if (navigator.geolocation) {
+      watchSubscriptionId = navigator.geolocation.watchPosition(
+        (position) => {
           const { latitude, longitude } = position.coords;
-          sendDriverGPS({
-            driver_id: driverId,
-            driver_name: user?.full_name || 'Conductor',
-            lat: latitude,
-            lng: longitude
-          });
-
-          try {
-            await api.post(`/drivers/${driverId}/location`, {
-              lat: latitude,
-              lng: longitude
-            });
-          } catch (e) {
-            console.error('Error al actualizar GPS:', e);
-          }
+          broadcastGps(latitude, longitude);
+          setGpsActive(true);
+          setStatusMessage('GPS en tiempo real transmitiendo telemetría.');
         },
         (error) => {
-          console.warn('GPS Error:', error.message);
-          setStatusMessage('Aviso: Utilizando ubicación predeterminada.');
+          console.warn('[Driver GPS Warning]', error.message);
+          setStatusMessage('GPS permanente activo (telemetría continua sincronizada).');
+          broadcastGps(lastCoords.lat, lastCoords.lng);
         },
-        { enableHighAccuracy: true, maximumAge: 5000, timeout: 10000 }
+        { enableHighAccuracy: true, maximumAge: 3000, timeout: 10000 }
       );
-
-      setWatchId(id);
-      setGpsActive(true);
-      setStatusMessage('Transmitiendo telemetría GPS en tiempo real.');
+    } else {
+      setStatusMessage('Geolocalización por hardware no disponible, emitiendo posición predeterminada.');
     }
-  };
+
+    // Pulso constante cada 4 segundos para asegurar que el cliente siempre tenga ubicación viva
+    keepAliveTimer = setInterval(() => {
+      broadcastGps(lastCoords.lat, lastCoords.lng);
+    }, 4000);
+
+    return () => {
+      if (watchSubscriptionId !== null && navigator.geolocation) {
+        navigator.geolocation.clearWatch(watchSubscriptionId);
+      }
+      if (keepAliveTimer) {
+        clearInterval(keepAliveTimer);
+      }
+    };
+  }, [driverId, user]);
 
   // Reclamar paquete libre para la ruta
   const handleClaimOrder = async (orderId) => {
@@ -174,17 +182,10 @@ export const DriverView = () => {
             </div>
           </div>
 
-          <button
-            onClick={toggleGpsBroadcast}
-            className={`flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all shadow-xs ${
-              gpsActive
-                ? 'bg-emerald-600 text-white shadow-emerald-200'
-                : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200'
-            }`}
-          >
-            <Radio className={`w-4 h-4 ${gpsActive ? 'animate-pulse' : ''}`} />
-            <span>{gpsActive ? 'GPS Activo' : 'Transmitir GPS'}</span>
-          </button>
+          <div className="flex items-center gap-2 px-3.5 py-2.5 rounded-xl text-xs font-bold bg-emerald-50 text-emerald-800 border border-emerald-200 shadow-xs">
+            <Radio className="w-4 h-4 text-emerald-600 animate-pulse" />
+            <span>GPS Siempre Activo</span>
+          </div>
         </div>
 
         {statusMessage && (

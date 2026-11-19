@@ -34,6 +34,23 @@ pool.on('connect', () => {
   console.log('[DB] Conectado exitosamente al pool de PostgreSQL / Supabase.');
 });
 
+// Auto-migración defensiva e idempotente de columnas de feedback y roles
+const ensureColumns = async () => {
+  try {
+    await pool.query(`
+      ALTER TABLE orders ADD COLUMN IF NOT EXISTS client_confirmed_received BOOLEAN;
+      ALTER TABLE orders ADD COLUMN IF NOT EXISTS client_recipient_relationship VARCHAR(50);
+      ALTER TABLE orders ADD COLUMN IF NOT EXISTS client_rating INT;
+      ALTER TABLE orders ADD COLUMN IF NOT EXISTS client_feedback TEXT;
+      ALTER TABLE orders ADD COLUMN IF NOT EXISTS client_feedback_at TIMESTAMPTZ;
+    `);
+    console.log('[DB] Esquema verificado: columnas de retroalimentación de entrega activas.');
+  } catch (e) {
+    console.warn('[DB Notice] Verificación de columnas de feedback diferida:', e.message);
+  }
+};
+ensureColumns();
+
 pool.on('error', (err) => {
   console.error('[DB Error] Error inesperado en el cliente inactivo de la base de datos:', err.message);
 });

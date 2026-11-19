@@ -242,6 +242,10 @@ const getOrderByTracking = async (req, res) => {
     const result = await db.query(
       `SELECT o.id, o.tracking_number, o.client_name, o.delivery_address,
               o.dest_lat, o.dest_lng, o.priority, o.status, o.created_at, o.delivered_at,
+              o.signature_data, o.assigned_driver_id,
+              o.client_confirmed_received, o.client_recipient_relationship,
+              o.client_rating, o.client_feedback, o.client_feedback_at,
+              d.id AS driver_id,
               u.full_name AS driver_name,
               u.phone AS driver_phone,
               d.vehicle_type,
@@ -410,20 +414,22 @@ const getMyOrders = async (req, res) => {
 
 const getAnalyticsAndAudit = async (req, res) => {
   try {
-    // 1. Métricas de órdenes
+    // 1. Métricas de órdenes y Satisfacción del Cliente
     const ordersRes = await db.query(`
       SELECT 
         COUNT(*)::int AS total_orders,
         COUNT(CASE WHEN status = 'DELIVERED' THEN 1 END)::int AS delivered_count,
         COUNT(CASE WHEN status = 'IN_TRANSIT' THEN 1 END)::int AS transit_count,
-        COUNT(CASE WHEN status = 'PENDING' THEN 1 END)::int AS pending_count
+        COUNT(CASE WHEN status = 'PENDING' THEN 1 END)::int AS pending_count,
+        ROUND(COALESCE(AVG(client_rating), 5.0), 1)::float AS avg_rating,
+        COUNT(CASE WHEN client_confirmed_received = true THEN 1 END)::int AS confirmed_by_client_count
       FROM orders
     `);
 
     // 2. Bitácora de Auditoría (order_status_logs)
     const auditRes = await db.query(`
       SELECT l.id, l.order_id, l.previous_status, l.new_status, l.notes, l.created_at,
-             o.tracking_number, o.client_name,
+             o.tracking_number, o.client_name, o.client_rating, o.client_confirmed_received,
              u.full_name AS user_name, u.role AS user_role
       FROM order_status_logs l
       LEFT JOIN orders o ON l.order_id = o.id
@@ -468,6 +474,69 @@ const getAnalyticsAndAudit = async (req, res) => {
   }
 };
 
+// Confirmación de entrega por parte del cliente, calificación y comentario
+const submitOrderFeedback = async (req, res) => {
+  try {
+    const { trackingNumber } = req.params;
+    const { confirmed_by_client, relationship, rating, feedback } = req.body;
+
+    const parsedRating = rating ? parseInt(rating, 10) : null;
+    if (parsedRating && (parsedRating < 1 || parsedRating > 5)) {
+      return res.status(400).json({
+        success: false,
+        message: 'La calificación debe ser un valor entero entre 1 y 5.'
+      });
+    }
+
+    const result = await db.query(
+      `UPDATE orders
+       SET client_confirmed_received = $1,
+           client_recipient_relationship = $2,
+           client_rating = $3,
+           client_feedback = $4,
+           client_feedback_at = NOW(),
+           updated_at = NOW()
+       WHERE tracking_number = $5
+       RETURNING id, tracking_number, status, client_confirmed_received, client_recipient_relationship, client_rating, client_feedback, client_feedback_at`,
+      [
+        confirmed_by_client !== undefined ? Boolean(confirmed_by_client) : true,
+        relationship || 'SELF',
+        parsedRating,
+        feedback ? feedback.trim() : null,
+        trackingNumber.trim()
+      ]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'No se encontró la orden especificada.'
+      });
+    }
+
+    const updatedOrder = result.rows[0];
+
+    // Transmitir vía Socket.io para actualización instantánea
+    if (req.app.get('io')) {
+      req.app.get('io').to(`tracking_${updatedOrder.tracking_number}`).emit('tracking:order_update', updatedOrder);
+      req.app.get('io').emit('order:feedback_submitted', updatedOrder);
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: 'Retroalimentación y confirmación registrada exitosamente.',
+      order: updatedOrder
+    });
+  } catch (err) {
+    console.error('[OrderController.submitOrderFeedback Error]', err);
+    return res.status(500).json({
+      success: false,
+      message: 'Error al registrar la confirmación del cliente.',
+      error: err.message
+    });
+  }
+};
+
 module.exports = {
   getAllOrders,
   createOrder,
@@ -475,5 +544,6 @@ module.exports = {
   getOrderByTracking,
   claimOrder,
   getMyOrders,
-  getAnalyticsAndAudit
+  getAnalyticsAndAudit,
+  submitOrderFeedback
 };

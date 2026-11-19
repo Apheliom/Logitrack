@@ -48,6 +48,11 @@ CREATE TABLE IF NOT EXISTS orders (
     assigned_driver_id UUID REFERENCES drivers(id) ON DELETE SET NULL,
     signature_data TEXT, -- Base64 de la firma capturada
     delivery_notes TEXT,
+    client_confirmed_received BOOLEAN DEFAULT NULL, -- Confirmación de si el cliente firmó
+    client_recipient_relationship VARCHAR(50) DEFAULT 'SELF', -- 'SELF' (él mismo) o 'THIRD_PARTY' (tercero)
+    client_rating INT DEFAULT NULL, -- Puntuación del cliente (1 a 5)
+    client_feedback TEXT DEFAULT NULL, -- Comentario u observación opcional del cliente
+    client_feedback_at TIMESTAMPTZ DEFAULT NULL,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     delivered_at TIMESTAMPTZ,
     updated_at TIMESTAMPTZ DEFAULT NOW()

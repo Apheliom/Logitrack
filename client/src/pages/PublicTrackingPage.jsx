@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { api } from '../api/client';
 import { useSocket } from '../context/SocketContext';
-import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import { LogiTrackLogo } from '../components/Brand/LogiTrackLogo';
 import {
@@ -15,8 +15,27 @@ import {
   Calendar,
   FileCheck,
   ShieldCheck,
-  ArrowRight
+  ArrowRight,
+  Star
 } from 'lucide-react';
+
+// Sincronizador dinámico del encuadre del mapa
+const MapBoundsUpdater = ({ destCoords, driverCoords }) => {
+  const map = useMap();
+  useEffect(() => {
+    if (!map) return;
+    if (destCoords && driverCoords && driverCoords.lat && driverCoords.lng) {
+      const bounds = L.latLngBounds([
+        [destCoords.lat, destCoords.lng],
+        [driverCoords.lat, driverCoords.lng]
+      ]);
+      map.fitBounds(bounds, { padding: [40, 40], maxZoom: 16 });
+    } else if (destCoords && destCoords.lat && destCoords.lng) {
+      map.setView([destCoords.lat, destCoords.lng], 14);
+    }
+  }, [map, destCoords?.lat, destCoords?.lng, driverCoords?.lat, driverCoords?.lng]);
+  return null;
+};
 
 const destinationIcon = L.divIcon({
   className: 'custom-destination-marker',
@@ -78,6 +97,13 @@ export const PublicTrackingPage = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
+  // Estados para validación de recepción y valoración del cliente
+  const [feedbackConfirmed, setFeedbackConfirmed] = useState(true);
+  const [feedbackRating, setFeedbackRating] = useState(5);
+  const [feedbackComment, setFeedbackComment] = useState('');
+  const [submittingFeedback, setSubmittingFeedback] = useState(false);
+  const [feedbackSuccessMsg, setFeedbackSuccessMsg] = useState('');
+
   const { socket, subscribeToOrder, unsubscribeFromOrder, driverLocations } = useSocket();
 
   const fetchTracking = async (code) => {
@@ -131,11 +157,40 @@ export const PublicTrackingPage = () => {
     }
   };
 
-  // Coordenadas actuales del conductor (vía socket o DB)
-  const currentDriverCoords = order && order.driver_lat && order.driver_lng ? {
-    lat: driverLocations[order.driver_id]?.lat || Number(order.driver_lat),
-    lng: driverLocations[order.driver_id]?.lng || Number(order.driver_lng)
-  } : null;
+  // Coordenadas actuales del conductor (prioridad: stream socket en vivo > DB)
+  const currentDriverCoords = (() => {
+    if (!order) return null;
+    const liveLoc = order.driver_id ? driverLocations[order.driver_id] : null;
+    if (liveLoc && liveLoc.lat && liveLoc.lng) {
+      return { lat: Number(liveLoc.lat), lng: Number(liveLoc.lng) };
+    }
+    if (order.driver_lat && order.driver_lng) {
+      return { lat: Number(order.driver_lat), lng: Number(order.driver_lng) };
+    }
+    return null;
+  })();
+
+  const handleFeedbackSubmit = async (e) => {
+    e.preventDefault();
+    if (!order?.tracking_number) return;
+    try {
+      setSubmittingFeedback(true);
+      const res = await api.post(`/orders/track/${order.tracking_number}/feedback`, {
+        confirmed_by_client: feedbackConfirmed,
+        relationship: feedbackConfirmed ? 'SELF' : 'THIRD_PARTY',
+        rating: feedbackRating,
+        feedback: feedbackComment
+      });
+      if (res.success && res.order) {
+        setOrder((prev) => ({ ...prev, ...res.order }));
+        setFeedbackSuccessMsg('Confirmación y valoración registradas exitosamente.');
+      }
+    } catch (err) {
+      alert('Error al registrar la confirmación: ' + (err.message || 'Error de red'));
+    } finally {
+      setSubmittingFeedback(false);
+    }
+  };
 
   const steps = [
     { key: 'PENDING', label: 'Registrado', desc: 'Orden recibida en el centro logístico.' },
@@ -314,6 +369,44 @@ export const PublicTrackingPage = () => {
                     maxZoom={19}
                   />
 
+                  {/* Auto-encuadre dinámico para mantener ambos puntos visibles conforme se mueve el repartidor */}
+                  <MapBoundsUpdater
+                    destCoords={{ lat: Number(order.dest_lat), lng: Number(order.dest_lng) }}
+                    driverCoords={currentDriverCoords}
+                  />
+
+                  {/* Polilínea de aproximación en tiempo real entre el repartidor y el destino */}
+                  {currentDriverCoords && order.dest_lat && order.dest_lng && (
+                    <>
+                      {/* Sombra de alto contraste */}
+                      <Polyline
+                        positions={[
+                          [currentDriverCoords.lat, currentDriverCoords.lng],
+                          [Number(order.dest_lat), Number(order.dest_lng)]
+                        ]}
+                        pathOptions={{
+                          color: '#0f172a',
+                          weight: 6,
+                          opacity: 0.25,
+                          dashArray: '8, 8'
+                        }}
+                      />
+                      {/* Trazo activo azul vibrante */}
+                      <Polyline
+                        positions={[
+                          [currentDriverCoords.lat, currentDriverCoords.lng],
+                          [Number(order.dest_lat), Number(order.dest_lng)]
+                        ]}
+                        pathOptions={{
+                          color: '#2563eb',
+                          weight: 4,
+                          opacity: 0.9,
+                          dashArray: '6, 6'
+                        }}
+                      />
+                    </>
+                  )}
+
                   {/* Destino */}
                   <Marker
                     position={[Number(order.dest_lat), Number(order.dest_lng)]}
@@ -336,9 +429,9 @@ export const PublicTrackingPage = () => {
                       <Popup>
                         <div className="text-xs p-1">
                           <strong className="text-emerald-700 block font-semibold">
-                            Repartidor: {order.driver_name}
+                            Repartidor: {order.driver_name || 'En camino'}
                           </strong>
-                          <span className="text-slate-600">Aproximándose a tu ubicación</span>
+                          <span className="text-slate-600">Aproximándose en tiempo real</span>
                         </div>
                       </Popup>
                     </Marker>
@@ -347,22 +440,192 @@ export const PublicTrackingPage = () => {
               </div>
             </div>
 
-            {/* Proof of Delivery (Firma) */}
-            {order.signature_data && (
-              <div className="bg-white border border-slate-200/80 p-6 rounded-3xl shadow-xs space-y-3">
-                <div className="flex items-center gap-2 text-emerald-700 font-bold text-sm">
-                  <ShieldCheck className="w-5 h-5 text-emerald-600" />
-                  <span>Comprobante de Entrega Digital (POD)</span>
+            {/* Proof of Delivery (Firma) y Validación de Recepción por el Cliente */}
+            {(order.status === 'DELIVERED' || order.signature_data) && (
+              <div className="bg-white border border-slate-200/80 p-6 rounded-3xl shadow-xs space-y-6">
+                <div>
+                  <div className="flex items-center gap-2 text-emerald-700 font-bold text-sm">
+                    <ShieldCheck className="w-5 h-5 text-emerald-600" />
+                    <span>Comprobante de Entrega Digital (POD)</span>
+                  </div>
+                  <p className="text-xs text-slate-500 mt-1">
+                    Firma digitalizada registrada al momento de la entrega física del pedido:
+                  </p>
+                  {order.signature_data ? (
+                    <div className="mt-3 bg-slate-50 p-4 rounded-2xl border border-slate-200 inline-block">
+                      <img
+                        src={order.signature_data}
+                        alt="Firma del receptor"
+                        className="max-h-28 rounded-lg"
+                      />
+                    </div>
+                  ) : (
+                    <div className="mt-2 text-xs text-slate-400 italic">
+                      Firma en proceso de sincronización.
+                    </div>
+                  )}
                 </div>
-                <p className="text-xs text-slate-500">
-                  Firma digitalizada capturada al momento de la recepción física del pedido:
-                </p>
-                <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 inline-block">
-                  <img
-                    src={order.signature_data}
-                    alt="Firma del receptor"
-                    className="max-h-28 rounded-lg"
-                  />
+
+                {/* Confirmación y Calificación del Cliente */}
+                <div className="pt-5 border-t border-slate-100">
+                  {order.client_confirmed_received !== null && order.client_confirmed_received !== undefined ? (
+                    <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-4 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-slate-800 flex items-center gap-2">
+                          <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                          <span>Validación de Recepción Completada</span>
+                        </span>
+                        {order.client_feedback_at && (
+                          <span className="text-[11px] text-slate-400">
+                            {new Date(order.client_feedback_at).toLocaleDateString()}
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                        <div className="p-3 bg-white rounded-xl border border-slate-100">
+                          <span className="text-slate-400 font-medium block">Recepción declarada:</span>
+                          <span className="text-slate-800 font-semibold mt-0.5 block">
+                            {order.client_confirmed_received
+                              ? 'Confirmado personalmente por el titular'
+                              : 'Recibido por un tercero / familiar'}
+                          </span>
+                        </div>
+
+                        <div className="p-3 bg-white rounded-xl border border-slate-100">
+                          <span className="text-slate-400 font-medium block">Calificación de Servicio:</span>
+                          <div className="flex items-center gap-1 mt-1">
+                            {[1, 2, 3, 4, 5].map((star) => (
+                              <Star
+                                key={star}
+                                className={`w-4 h-4 ${
+                                  star <= (order.client_rating || 5)
+                                    ? 'text-amber-400 fill-amber-400'
+                                    : 'text-slate-200'
+                                }`}
+                              />
+                            ))}
+                            <span className="text-xs font-bold text-slate-700 ml-1.5">
+                              {order.client_rating || 5}/5
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {order.client_feedback && (
+                        <div className="p-3 bg-white rounded-xl border border-slate-100 text-xs">
+                          <span className="text-slate-400 font-medium block">Comentario del cliente:</span>
+                          <p className="text-slate-700 font-medium mt-1">"{order.client_feedback}"</p>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <form onSubmit={handleFeedbackSubmit} className="space-y-4">
+                      <div>
+                        <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
+                          Validación de Entrega y Calificación
+                        </h4>
+                        <p className="text-xs text-slate-500 mt-0.5">
+                          Indica si fuiste tú quien recibió la orden y evalúa el servicio del repartidor.
+                        </p>
+                      </div>
+
+                      {feedbackSuccessMsg && (
+                        <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs flex items-center gap-2">
+                          <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                          <span>{feedbackSuccessMsg}</span>
+                        </div>
+                      )}
+
+                      {/* Selección de receptor */}
+                      <div>
+                        <label className="text-xs font-semibold text-slate-700 block mb-2">
+                          ¿Fuiste tú quien recibió y firmó el pedido?
+                        </label>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          <button
+                            type="button"
+                            onClick={() => setFeedbackConfirmed(true)}
+                            className={`p-3 rounded-xl border text-xs font-semibold text-left transition-all ${
+                              feedbackConfirmed
+                                ? 'bg-blue-50 border-blue-500 text-blue-900 ring-2 ring-blue-100'
+                                : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
+                            }`}
+                          >
+                            <span className="block font-bold">Sí, fui yo personalmente</span>
+                            <span className="text-[11px] text-slate-500 font-normal">
+                              Reconozco la firma y recibí los productos conforme.
+                            </span>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => setFeedbackConfirmed(false)}
+                            className={`p-3 rounded-xl border text-xs font-semibold text-left transition-all ${
+                              !feedbackConfirmed
+                                ? 'bg-amber-50 border-amber-500 text-amber-900 ring-2 ring-amber-100'
+                                : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
+                            }`}
+                          >
+                            <span className="block font-bold">No, fue recibido por otra persona</span>
+                            <span className="text-[11px] text-slate-500 font-normal">
+                              Familiar, recepción o compañero de trabajo en mi lugar.
+                            </span>
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Calificación de Estrellas */}
+                      <div>
+                        <label className="text-xs font-semibold text-slate-700 block mb-1.5">
+                          Calificación del servicio:
+                        </label>
+                        <div className="flex items-center gap-2">
+                          {[1, 2, 3, 4, 5].map((star) => (
+                            <button
+                              key={star}
+                              type="button"
+                              onClick={() => setFeedbackRating(star)}
+                              className="p-1 hover:scale-110 transition-transform focus:outline-hidden"
+                            >
+                              <Star
+                                className={`w-6 h-6 ${
+                                  star <= feedbackRating
+                                    ? 'text-amber-400 fill-amber-400'
+                                    : 'text-slate-300'
+                                }`}
+                              />
+                            </button>
+                          ))}
+                          <span className="text-xs font-bold text-slate-700 ml-2">
+                            {feedbackRating} de 5 estrellas
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Comentario Opcional */}
+                      <div>
+                        <label className="text-xs font-semibold text-slate-700 block mb-1.5">
+                          Comentario u observación (Opcional):
+                        </label>
+                        <textarea
+                          rows={2}
+                          value={feedbackComment}
+                          onChange={(e) => setFeedbackComment(e.target.value)}
+                          placeholder="Ej: Entrega puntual y paquete en perfecto estado..."
+                          className="w-full text-xs p-3 rounded-xl border border-slate-200 focus:outline-hidden focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                        />
+                      </div>
+
+                      <button
+                        type="submit"
+                        disabled={submittingFeedback}
+                        className="px-5 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold transition-all shadow-xs disabled:opacity-50"
+                      >
+                        {submittingFeedback ? 'Guardando...' : 'Enviar Confirmación y Valoración'}
+                      </button>
+                    </form>
+                  )}
                 </div>
               </div>
             )}

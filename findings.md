@@ -65,3 +65,18 @@ logitrack/
     │   └── main.jsx
     └── package.json
 ```
+
+
+---
+
+## 5. Diagnóstico de Telemetría GPS y Tracking de Cliente en Tiempo Real
+* **Hallazgo 1 (Filtro SQL en `getOrderByTracking`):** En `server/src/controllers/orderController.js`, la consulta SQL omitía `d.id AS driver_id` y `o.assigned_driver_id`. Esto provocaba que en el cliente (`PublicTrackingPage.jsx`) `order.driver_id` fuera `undefined`, imposibilitando mapear la posición recibida por Socket.io (`driverLocations[order.driver_id]`).
+* **Hallazgo 2 (Condición de renderizado de coordenadas):** En `PublicTrackingPage.jsx`, la variable `currentDriverCoords` exigía estrictamente `order.driver_lat && order.driver_lng`. Si la base de datos tenía valores nulos iniciales, la posición del socket era descartada.
+* **Hallazgo 3 (Visualización de trayectoria):** En el mapa del cliente solo existían marcadores aislados de destino y conductor, sin una polilínea continua de aproximación ni ajuste de encuadre automático (`fitBounds`).
+* **Hallazgo 4 (Activación manual de GPS en Driver):** En `DriverView.jsx`, la transmisión GPS iniciaba inactiva (`gpsActive = false`), dependiendo de una pulsación manual del usuario. Requiere auto-arranque en el montaje (`useEffect`) con fallback de posición garantizada.
+
+
+## 6. Implementación de Validación de Entrega (POD Cliente) y Telemetría Permanente
+* **Endpoint de Retroalimentación:** Incorporado `POST /api/orders/track/:trackingNumber/feedback` en `orderRoutes.js` y `orderController.js`, permitiendo al receptor validar si él personalmente firmó o si fue un tercero (`client_confirmed_received`, `client_recipient_relationship`), además de registrar una calificación (`client_rating`, 1-5 estrellas) y observación (`client_feedback`).
+* **Telemetría Conductor Continua:** Modificado `DriverView.jsx` para arrancar automáticamente la geolocalización al montar la vista (`watchPosition`), con temporizador de respaldo continuo (pulso cada 4 segundos) hacia el backend y canal WebSocket (`telemetry:driver_location`).
+* **Visualización de Trayectoria Dinámica:** Actualizado `PublicTrackingPage.jsx` con `<Polyline />` de alto contraste en tiempo real y componente `<MapBoundsUpdater />` para auto-encuadrar al conductor y al destino de manera continua sin recargas de página.

@@ -7,12 +7,14 @@ const {
   getOrderByTracking,
   claimOrder,
   getMyOrders,
-  getAnalyticsAndAudit
+  getAnalyticsAndAudit,
+  submitOrderFeedback
 } = require('../controllers/orderController');
 const { verifyToken, requireRole } = require('../middleware/auth');
 
 // Endpoint público para el cliente final (no requiere JWT)
 router.get('/track/:trackingNumber', getOrderByTracking);
+router.post('/track/:trackingNumber/feedback', submitOrderFeedback);
 
 // Endpoints protegidos
 router.get('/my-orders', verifyToken, getMyOrders);
