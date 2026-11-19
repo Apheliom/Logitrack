@@ -2,6 +2,7 @@ const express = require('express');
 const multer = require('multer');
 const crypto = require('crypto');
 const ForensicService = require('../services/forensicService');
+const ImageForensicService = require('../services/imageForensicService');
 const AudioService = require('../services/audioService');
 const siemService = require('../services/siemService');
 const { insertAuditLog, getAuditLogById } = require('../db');
@@ -45,7 +46,19 @@ router.post('/analyze-file', memoryProtectionGuard, upload.single('file'), async
     const { buffer, originalname, mimetype } = req.file;
     const operator = req.body.operator || 'Auditor_Pericial_Sistemas';
 
-    const analysisResult = await ForensicService.analyzeBuffer(buffer, originalname, mimetype);
+    // Restricción Pericial: Este módulo admite única y exclusivamente archivos de imagen
+    const isImageMime = mimetype && (mimetype.startsWith('image/') || mimetype === 'application/octet-stream');
+    const imageExtensions = ['.jpg', '.jpeg', '.png', '.webp', '.heic', '.bmp', '.tiff'];
+    const hasImageExt = imageExtensions.some(ext => originalname.toLowerCase().endsWith(ext));
+    if (!isImageMime && !hasImageExt) {
+      return res.status(400).json({
+        success: false,
+        error: 'El módulo de análisis forense visual admite exclusivamente archivos de imagen (JPEG, PNG, WebP). Para análisis de audio o video, diríjase a sus respectivos módulos periciales.'
+      });
+    }
+
+    // Ejecución del Nuevo Motor Forense de Imágenes Reconstruido desde Cero (IFIE v4.0)
+    const analysisResult = await ImageForensicService.evaluateImageForensics(buffer, originalname, mimetype);
 
     let liveGps = null;
     if (req.body.liveGps) {

@@ -70,15 +70,19 @@ export default function FileAnalyzer() {
 
   const handleFileChange = useCallback((selectedFile) => {
     if (!selectedFile) return;
+
+    // Validación estricta: módulo exclusivo para análisis forense de imágenes
+    const isImage = selectedFile.type.startsWith('image/') || /\.(jpg|jpeg|png|webp|heic)$/i.test(selectedFile.name);
+    if (!isImage) {
+      alert('Aviso Pericial: El módulo de Visión Forense admite exclusivamente archivos de imagen (JPEG, PNG, WebP). Para peritaje de audio o video, diríjase a sus respectivos módulos en el menú.');
+      return;
+    }
+
     setFile(selectedFile);
     setFileAnalysisResult(null);
 
-    if (selectedFile.type.startsWith('image/')) {
-      const url = URL.createObjectURL(selectedFile);
-      setPreviewUrl(url);
-    } else {
-      setPreviewUrl(null);
-    }
+    const url = URL.createObjectURL(selectedFile);
+    setPreviewUrl(url);
   }, [setFileAnalysisResult]);
 
   const handleDrop = useCallback((e) => {
@@ -246,7 +250,7 @@ export default function FileAnalyzer() {
               ref={fileInputRef}
               onChange={(e) => handleFileChange(e.target.files[0])}
               className="hidden"
-              accept="image/*,video/*,audio/*,application/pdf"
+              accept="image/jpeg,image/png,image/webp,image/heic,.jpg,.jpeg,.png,.webp,.heic"
             />
 
             <div className="relative">
@@ -260,13 +264,13 @@ export default function FileAnalyzer() {
             </div>
 
             <h3 className="text-base font-bold text-white tracking-tight">
-              Escáner Pericial Activo
+              Escáner Pericial de Imágenes
             </h3>
             <p className="text-xs text-zinc-400 mt-1 max-w-xs font-mono">
-              Arrastra o haz clic para cargar cualquier evidencia multimedia
+              Arrastra o haz clic para cargar la imagen fotográfica a peritar
             </p>
             <p className="text-[11px] text-cyan-400/80 font-mono mt-0.5">
-              JPG • PNG • WEBP • MP4 • PDF • WAV (hasta 30MB)
+              JPG • PNG • WEBP • HEIC (Exclusivo Imágenes)
             </p>
 
             <div className="mt-5 inline-flex items-center space-x-2 text-[11px] font-mono text-cyan-300 bg-cyan-950/50 px-3.5 py-1.5 rounded-full border border-cyan-800/50 shadow-sm">

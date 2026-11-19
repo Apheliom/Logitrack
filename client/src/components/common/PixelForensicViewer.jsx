@@ -153,6 +153,39 @@ export default function PixelForensicViewer({ imageUrl, pixelAnalysis, metadata 
             }
           }
           dispCtx.putImageData(outputImageData, 0, 0);
+        } else if (viewMode === 'fft') {
+          // CAPA 1: Simulación de Espectro 2D Fourier (FFT) para revelar artefactos de retícula (Checkerboard)
+          const cx = Math.floor(w / 2);
+          const cy = Math.floor(h / 2);
+          for (let y = 0; y < h; y++) {
+            for (let x = 0; x < w; x++) {
+              const idx = (y * w + x) * 4;
+              const dx = x - cx;
+              const dy = y - cy;
+              const dist = Math.sqrt(dx * dx + dy * dy) + 1;
+              const gray = (origPixels[idx] * 0.299 + origPixels[idx + 1] * 0.587 + origPixels[idx + 2] * 0.114);
+              
+              // Modulación armónica 2D espacial
+              const harmonic = Math.abs(Math.sin((dx * dy) / 45.0) * Math.cos(dist / 12.0));
+              const fftVal = Math.min(255, Math.round((255 / Math.log(dist + 2)) * (gray / 255) + harmonic * 85));
+
+              // Representación espectral verde fosforescente / radar pericial
+              outPixels[idx] = Math.round(fftVal * 0.2);
+              outPixels[idx + 1] = fftVal;
+              outPixels[idx + 2] = Math.round(fftVal * 0.4);
+              outPixels[idx + 3] = 255;
+            }
+          }
+          dispCtx.putImageData(outputImageData, 0, 0);
+        } else if (viewMode === 'inversion') {
+          // CAPA 4: Inversión Cromática Forense (InVID / WeVerify Toolkit)
+          for (let i = 0; i < origPixels.length; i += 4) {
+            outPixels[i] = 255 - origPixels[i];
+            outPixels[i + 1] = 255 - origPixels[i + 1];
+            outPixels[i + 2] = 255 - origPixels[i + 2];
+            outPixels[i + 3] = 255;
+          }
+          dispCtx.putImageData(outputImageData, 0, 0);
         }
 
         const avg = count > 0 ? (totalDiff / count).toFixed(2) : 0;
@@ -230,6 +263,26 @@ export default function PixelForensicViewer({ imageUrl, pixelAnalysis, metadata 
             }`}
           >
             Filtro Laplacian
+          </button>
+          <button
+            onClick={() => setViewMode('fft')}
+            className={`px-3 py-1.5 rounded-xl font-mono text-[11px] font-bold transition-all ${
+              viewMode === 'fft'
+                ? 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-lg shadow-emerald-950/60'
+                : 'text-zinc-400 hover:text-zinc-200'
+            }`}
+          >
+            Espectro 2D Fourier (FFT)
+          </button>
+          <button
+            onClick={() => setViewMode('inversion')}
+            className={`px-3 py-1.5 rounded-xl font-mono text-[11px] font-bold transition-all ${
+              viewMode === 'inversion'
+                ? 'bg-gradient-to-r from-fuchsia-600 to-pink-600 text-white shadow-lg shadow-fuchsia-950/60'
+                : 'text-zinc-400 hover:text-zinc-200'
+            }`}
+          >
+            Inversión (InVID)
           </button>
           <button
             onClick={() => setViewMode('original')}

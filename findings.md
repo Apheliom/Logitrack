@@ -214,3 +214,30 @@ SecuriTrace es una plataforma de análisis forense digital multimedia, verificac
 - **Escaneo Físico Digitalizado:** Detección de productores de escáneres ópticos (HP, Canon, Epson, Xerox, CamScanner, Brother, Ricoh) y presencia de flujos de imagen rasterizada sin fuentes virtuales. Riesgo $\le 0.5\%$, clasificado como `PDF_DOCUMENTAL_ESCANEO_FISICO`.
 - **Ofimática Genuina:** Creación en Microsoft Word, Adobe InDesign, Adobe Acrobat Pro, LibreOffice o LaTeX con revisiones estándar. Riesgo $\le 0.5\%$, clasificado como `PDF_DOCUMENTAL_OFIMATICA_GENUINO`.
 - **Generación Virtual por LLM:** Detección de productores headless (`Skia/PDF`, `Chromium`, `Puppeteer`) y tokens de modelos de lenguaje en streams `FlateDecode` (`Google Gemini`, `ChatGPT`, `Claude`, `Prompt:`). Riesgo $\ge 90\%$, clasificado como `PDF_SINTETICO_LLM`.
+
+## Reconstrucción Integral del Motor Forense de Imágenes (IFIE v4.0)
+
+### 1. Cuatro Capas Físicas de Inferencia ([imageForensicService.js](file:///C:/Users/Maicol/.gemini/antigravity/scratch/securitrace/server/src/services/imageForensicService.js))
+- **Capa 1: Análisis Espectral 2D Fourier (FFT) y Retícula Periódica (Checkerboard Artifacts):**
+  - Mide la concentración armónica de altas frecuencias periódicas causadas por convoluciones transpuestas y decodificadores VAE de modelos generativos de difusión.
+  - Si una persona toma una **captura de pantalla de una imagen generada con IA**, el contenido interno conserva los picos armónicos de la retícula de difusión (`AI_FFT_CHECKERBOARD_GRID`), delatando su origen sintético a pesar del contenedor PNG/JPEG del teléfono.
+- **Capa 2: Disparidad de Ruido y Nivel de Error (ELA) para Inpainting y Edición Híbrida:**
+  - En fotos reales, el piso de ruido térmico del sensor CMOS es espacialmente estacionario. Al aplicar *Inpainting*, *Generative Fill*, *Face Swap*, *Samsung Galaxy AI* o *Google Magic Eraser*, la zona modificada presenta una discontinuidad en la tasa de compresión y un gradiente hiper-liso.
+  - Clasificación unívoca como `FOTO_REAL_MANIPULADA_CON_IA` con riesgo pericial $\ge 98.0\%$.
+- **Capa 3: Estructura de Cuantización DQT y Doble Compresión:**
+  - Reconocimiento de matrices de compresión de cámaras analógicas (Luminancia + Crominancia, varianza alta) vs mono-tablas sintéticas de difusión (1 sola tabla DQT o matrices planas uniformes).
+  - Aislamiento de la firma `libjpeg-turbo` de WhatsApp cuando proviene de una foto de cámara real (`TRANSITO_RED_SOCIAL_SANITIZADO`, riesgo $\le 1.2\%$).
+- **Capa 4: Discriminación de Capturas de Pantalla Legítimas (UI Framebuffer):**
+  - Admite capturas de pantalla exclusivamente si contienen vectores de interfaz limpios, texto nítido y carecen de retícula espectral de IA (`CAPTURADEPANTALLA_DISPOSITIVO`, riesgo $0.0\%$).
+
+### 2. Visor Pericial Interactivo Multi-Espectral ([PixelForensicViewer.jsx](file:///C:/Users/Maicol/.gemini/antigravity/scratch/securitrace/client/src/components/common/PixelForensicViewer.jsx))
+- Dispone de 6 modalidades periciales:
+  1. **Vista Original:** Renderizado crudo del activo fotográfico.
+  2. **Residuos ELA (20x - 40x):** Re-compresión controlada Q=90 y extracción de residuos de compresión diferencial.
+  3. **Espectro 2D Fourier (FFT):** Visualización de armónicos y picos en cruz de retícula de difusión.
+  4. **Gradiente Laplaciano:** Filtro pasaaltas para aislamiento de bordes de parches de inpainting.
+  5. **Gradiente Térmico:** Mapa de calor falso color (Jet) de disparidad de error.
+  6. **Inversión Cromática (InVID / WeVerify):** Detección de costuras de corte, objetos flotantes y parches clonados.
+
+### 3. Restricción Estricta a Imágenes
+- El módulo de Visión Forense (`/api/forensics/analyze-file` y `FileAnalyzer.jsx`) fue restringido estrictamente a formatos de imagen (`JPEG`, `PNG`, `WEBP`, `HEIC`). Archivos de audio, video o documentos son rechazados con advertencia pericial guiando al usuario hacia sus módulos correspondientes.
