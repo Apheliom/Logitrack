@@ -8,6 +8,7 @@ import { RegisterPage } from './pages/RegisterPage';
 import { AdminDashboard } from './pages/AdminDashboard';
 import { DriverView } from './pages/DriverView';
 import { PublicTrackingPage } from './pages/PublicTrackingPage';
+import { CustomerStorePage } from './pages/CustomerStorePage';
 
 // Componente para Proteger Rutas
 const ProtectedRoute = ({ children, allowedRoles = [] }) => {
@@ -45,6 +46,7 @@ export function App() {
                 {/* Rutas Públicas */}
                 <Route path="/login" element={<LoginPage />} />
                 <Route path="/register" element={<RegisterPage />} />
+                <Route path="/store" element={<CustomerStorePage />} />
                 <Route path="/track/:trackingNumber?" element={<PublicTrackingPage />} />
 
                 {/* Rutas Protegidas de Despacho (Admin) */}

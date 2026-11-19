@@ -125,18 +125,32 @@ export const LiveFleetMap = ({
   const { driverLocations } = useSocket();
   const depotCoords = [4.6534, -74.0836];
 
-  // Extraer coordenadas de la polilínea
+  // Extraer coordenadas de la polilínea (con fallback automático sobre paradas si aún no hay ruta en BD)
   const routePolyline = useMemo(() => {
-    if (!activeRoute?.route_geojson) return null;
-    try {
-      const geo = typeof activeRoute.route_geojson === 'string'
-        ? JSON.parse(activeRoute.route_geojson)
-        : activeRoute.route_geojson;
-      return geo?.geometry?.coordinates?.map(c => [c[1], c[0]]) || null;
-    } catch {
-      return null;
+    if (activeRoute?.route_geojson) {
+      try {
+        const geo = typeof activeRoute.route_geojson === 'string'
+          ? JSON.parse(activeRoute.route_geojson)
+          : activeRoute.route_geojson;
+        const coords = geo?.geometry?.coordinates?.map(c => [c[1], c[0]]);
+        if (coords && coords.length > 1) return coords;
+      } catch {
+        // Fallback abajo
+      }
     }
-  }, [activeRoute]);
+
+    // Fallback visible si hay órdenes cargadas: trazar circuito desde depósito
+    if (orders.length > 0) {
+      const stops = orders
+        .filter(o => o.dest_lat && o.dest_lng)
+        .map(o => [Number(o.dest_lat), Number(o.dest_lng)]);
+      if (stops.length > 0) {
+        return [depotCoords, ...stops];
+      }
+    }
+
+    return null;
+  }, [activeRoute, orders]);
 
   const getStatusColor = (status) => {
     switch (status) {
@@ -185,18 +199,33 @@ export const LiveFleetMap = ({
           </Popup>
         </Marker>
 
-        {/* Polilínea de Ruta Optimizada */}
-        {routePolyline && (
-          <Polyline
-            positions={routePolyline}
-            pathOptions={{
-              color: '#4f46e5',
-              weight: 4.5,
-              opacity: 0.85,
-              dashArray: '8, 8',
-              lineJoin: 'round'
-            }}
-          />
+        {/* Polilínea de Ruta Optimizada (Doble trazo de alto contraste) */}
+        {routePolyline && routePolyline.length > 1 && (
+          <>
+            {/* Trazo sombra exterior */}
+            <Polyline
+              positions={routePolyline}
+              pathOptions={{
+                color: '#1e1b4b',
+                weight: 7,
+                opacity: 0.35,
+                lineCap: 'round',
+                lineJoin: 'round'
+              }}
+            />
+            {/* Trazo principal azul vibrante */}
+            <Polyline
+              positions={routePolyline}
+              pathOptions={{
+                color: '#2563eb',
+                weight: 4.5,
+                opacity: 0.95,
+                dashArray: '10, 8',
+                lineCap: 'round',
+                lineJoin: 'round'
+              }}
+            />
+          </>
         )}
 
         {/* Marcadores de Pedidos / Paradas */}

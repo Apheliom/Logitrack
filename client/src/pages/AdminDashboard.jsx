@@ -10,12 +10,12 @@ import {
 
 // --- Sub-components ---
 
-const StatCard = ({ label, value, icon: Icon, color = 'text-ink-primary' }) => (
-  <div className="bg-white border border-surface-3 rounded-2xl p-5 shadow-card">
+const StatCard = ({ label, value, icon: Icon, color = 'text-slate-900', bgColor = 'bg-slate-50' }) => (
+  <div className="bg-white border border-slate-200/90 rounded-2xl p-5 shadow-xs hover:border-slate-300 transition-colors">
     <div className="flex items-center justify-between mb-3">
-      <span className="text-xs font-medium text-ink-tertiary">{label}</span>
-      <div className="p-1.5 rounded-lg bg-surface-2">
-        <Icon className="w-3.5 h-3.5 text-ink-tertiary" strokeWidth={1.75} />
+      <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">{label}</span>
+      <div className={`p-2 rounded-xl ${bgColor} border border-slate-100`}>
+        <Icon className={`w-4 h-4 ${color}`} strokeWidth={2} />
       </div>
     </div>
     <div className={`text-2xl font-bold tabular-nums tracking-tight ${color}`}>{value}</div>
@@ -24,15 +24,15 @@ const StatCard = ({ label, value, icon: Icon, color = 'text-ink-primary' }) => (
 
 const StatusBadge = ({ status }) => {
   const map = {
-    PENDING:    { label: 'Pendiente',    className: 'bg-amber-50 text-amber-700 border-amber-200' },
-    ASSIGNED:   { label: 'Asignado',     className: 'bg-blue-50 text-blue-700 border-blue-200' },
-    IN_TRANSIT: { label: 'En tránsito',  className: 'bg-violet-50 text-violet-700 border-violet-200' },
-    DELIVERED:  { label: 'Entregado',    className: 'bg-green-50 text-green-700 border-green-200' },
-    FAILED:     { label: 'Fallido',      className: 'bg-red-50 text-red-700 border-red-200' },
+    PENDING:    { label: 'Pendiente',    className: 'bg-amber-50 text-amber-800 border-amber-300/80' },
+    ASSIGNED:   { label: 'Asignado',     className: 'bg-sky-50 text-sky-800 border-sky-300/80' },
+    IN_TRANSIT: { label: 'En tránsito',  className: 'bg-indigo-50 text-indigo-800 border-indigo-300/80' },
+    DELIVERED:  { label: 'Entregado',    className: 'bg-emerald-50 text-emerald-800 border-emerald-300/80' },
+    FAILED:     { label: 'Fallido',      className: 'bg-rose-50 text-rose-800 border-rose-300/80' },
   };
-  const cfg = map[status] || { label: status, className: 'bg-surface-2 text-ink-tertiary border-surface-3' };
+  const cfg = map[status] || { label: status, className: 'bg-slate-100 text-slate-700 border-slate-300' };
   return (
-    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold border ${cfg.className}`}>
+    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold border ${cfg.className}`}>
       {cfg.label}
     </span>
   );
@@ -139,23 +139,25 @@ export const AdminDashboard = () => {
 
       {/* Stat cards */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        <StatCard label="Total órdenes"  value={metrics.total}     icon={Package}     />
-        <StatCard label="Pendientes"     value={metrics.pending}   icon={Clock}       color="text-amber-600" />
-        <StatCard label="En tránsito"    value={metrics.transit}   icon={Truck}       color="text-violet-600" />
-        <StatCard label="Entregadas"     value={metrics.delivered} icon={CheckCircle2} color="text-status-success" />
+        <StatCard label="Total órdenes"  value={metrics.total}     icon={Package}     color="text-slate-900" bgColor="bg-slate-100" />
+        <StatCard label="Pendientes"     value={metrics.pending}   icon={Clock}       color="text-amber-700" bgColor="bg-amber-50" />
+        <StatCard label="En tránsito"    value={metrics.transit}   icon={Truck}       color="text-indigo-700" bgColor="bg-indigo-50" />
+        <StatCard label="Entregadas"     value={metrics.delivered} icon={CheckCircle2} color="text-emerald-700" bgColor="bg-emerald-50" />
       </div>
 
       {/* Map + Route optimizer */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
         {/* Map */}
-        <div className="lg:col-span-2 space-y-2">
-          <div className="flex items-center justify-between">
-            <h2 className="text-sm font-semibold text-ink-primary flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-status-success animate-pulse" />
-              Mapa de flota en tiempo real
+        <div className="lg:col-span-2 space-y-3">
+          <div className="flex items-center justify-between px-1">
+            <h2 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+              <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
+              <span>Mapa de Flota en Tiempo Real</span>
             </h2>
-            <span className="text-xs text-ink-tertiary">{drivers.length} vehículos monitoreados</span>
+            <span className="text-xs font-medium text-slate-500 bg-white px-2.5 py-1 rounded-full border border-slate-200 shadow-2xs">
+              {drivers.length} Vehículos en radar
+            </span>
           </div>
           <LiveFleetMap orders={orders} drivers={drivers} activeRoute={activeRoute} center={[4.6534, -74.0836]} zoom={13} />
         </div>
@@ -164,47 +166,61 @@ export const AdminDashboard = () => {
         <div className="space-y-4">
 
           {/* Route optimizer card */}
-          <div className="bg-white border border-surface-3 rounded-2xl p-5 shadow-card space-y-4">
+          <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-xs space-y-4">
             <div>
-              <div className="flex items-center gap-2 mb-0.5">
-                <Zap className="w-4 h-4 text-brand-600" strokeWidth={2} />
-                <h3 className="text-sm font-semibold text-ink-primary">Optimizador de ruta</h3>
+              <div className="flex items-center gap-2 mb-1">
+                <div className="p-1.5 rounded-lg bg-blue-50 text-blue-600">
+                  <Zap className="w-4 h-4" strokeWidth={2.2} />
+                </div>
+                <h3 className="text-sm font-bold text-slate-900">Optimizador de Ruta (2-opt)</h3>
               </div>
-              <p className="text-xs text-ink-tertiary">Algoritmo 2-opt heurístico sobre distancias de Haversine.</p>
+              <p className="text-xs text-slate-500">
+                Calcula la secuencia más corta para reducir distancias y consumo.
+              </p>
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-xs font-medium text-ink-secondary">Conductor</label>
+              <label className="text-xs font-semibold text-slate-700">Conductor Asignado</label>
               <select
-                className="w-full px-3 py-2 bg-surface-1 border border-surface-3 rounded-xl text-sm text-ink-primary focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500 transition"
-                value={selDriver} onChange={e => setSelDriver(e.target.value)}
+                className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition"
+                value={selDriver}
+                onChange={e => setSelDriver(e.target.value)}
               >
                 {drivers.map(d => <option key={d.id} value={d.id}>{d.full_name} · {d.vehicle_type}</option>)}
               </select>
             </div>
 
-            <button onClick={handleOptimize} disabled={optimizing}
-              className="w-full flex items-center justify-center gap-2 py-2.5 bg-brand-600 hover:bg-brand-700 disabled:opacity-60 text-white font-semibold text-sm rounded-xl transition-colors shadow-sm"
+            <button
+              onClick={handleOptimize}
+              disabled={optimizing}
+              className="w-full flex items-center justify-center gap-2 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white font-semibold text-sm rounded-xl transition shadow-xs"
             >
               <Zap className="w-4 h-4" strokeWidth={2} />
-              {optimizing ? 'Calculando…' : 'Calcular ruta óptima'}
+              <span>{optimizing ? 'Optimizando con 2-opt…' : 'Calcular Ruta Óptima'}</span>
             </button>
 
-            {optMsg && <p className="text-xs text-ink-secondary bg-surface-1 border border-surface-3 rounded-xl px-3 py-2">{optMsg}</p>}
+            {optMsg && (
+              <div className="text-xs text-blue-800 bg-blue-50/80 border border-blue-200 rounded-xl p-3">
+                {optMsg}
+              </div>
+            )}
           </div>
 
           {/* Drivers status */}
-          <div className="bg-white border border-surface-3 rounded-2xl p-5 shadow-card">
-            <h3 className="text-sm font-semibold text-ink-primary mb-3">Estado de repartidores</h3>
+          <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-xs">
+            <h3 className="text-sm font-bold text-slate-900 mb-3 flex items-center justify-between">
+              <span>Estado de Conductores</span>
+              <span className="text-[11px] font-normal text-slate-500">({drivers.length} activos)</span>
+            </h3>
             <div className="space-y-2.5 max-h-56 overflow-y-auto pr-1">
               {drivers.map(d => (
-                <div key={d.id} className="flex items-center justify-between gap-3 p-3 rounded-xl bg-surface-1 border border-surface-3">
+                <div key={d.id} className="flex items-center justify-between gap-3 p-3 rounded-2xl bg-slate-50 border border-slate-200/80 hover:bg-slate-100/60 transition-colors">
                   <div className="min-w-0">
-                    <div className="text-sm font-medium text-ink-primary truncate">{d.full_name}</div>
-                    <div className="text-xs text-ink-tertiary">{d.vehicle_type} · {d.license_plate}</div>
+                    <div className="text-xs font-bold text-slate-900 truncate">{d.full_name}</div>
+                    <div className="text-[11px] text-slate-500">{d.vehicle_type} · {d.license_plate}</div>
                   </div>
-                  <span className={`shrink-0 text-[10px] font-bold px-2 py-0.5 rounded-full border ${d.status === 'ON_DELIVERY' ? 'bg-violet-50 text-violet-700 border-violet-200' : 'bg-green-50 text-green-700 border-green-200'}`}>
-                    {d.status === 'ON_DELIVERY' ? 'En ruta' : 'Libre'}
+                  <span className={`shrink-0 text-[10px] font-bold px-2.5 py-0.5 rounded-full border ${d.status === 'ON_DELIVERY' ? 'bg-indigo-50 text-indigo-700 border-indigo-200' : 'bg-emerald-50 text-emerald-700 border-emerald-200'}`}>
+                    {d.status === 'ON_DELIVERY' ? 'En ruta' : 'Disponible'}
                   </span>
                 </div>
               ))}
@@ -215,19 +231,25 @@ export const AdminDashboard = () => {
       </div>
 
       {/* Orders table */}
-      <div className="bg-white border border-surface-3 rounded-2xl shadow-card overflow-hidden">
-        <div className="px-5 py-4 border-b border-surface-3 flex flex-col sm:flex-row items-center justify-between gap-3">
-          <h3 className="text-sm font-semibold text-ink-primary flex items-center gap-2">
-            <Package className="w-4 h-4 text-ink-tertiary" strokeWidth={1.75} />
-            Órdenes de entrega
-          </h3>
+      <div className="bg-white border border-slate-200 rounded-3xl shadow-xs overflow-hidden">
+        <div className="px-6 py-4 border-b border-slate-200/90 bg-slate-50/70 flex flex-col sm:flex-row items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <Package className="w-4 h-4 text-slate-500" />
+            <h3 className="text-sm font-bold text-slate-900">Listado de Órdenes y Envíos</h3>
+          </div>
           {/* Filter tabs */}
-          <div className="flex items-center gap-1 bg-surface-1 border border-surface-3 p-0.5 rounded-xl text-xs">
+          <div className="flex items-center gap-1 bg-white border border-slate-200 p-1 rounded-xl text-xs shadow-2xs">
             {['ALL', 'PENDING', 'IN_TRANSIT', 'DELIVERED'].map(s => (
-              <button key={s} onClick={() => setFilterStatus(s)}
-                className={`px-3 py-1.5 rounded-lg font-medium transition ${filterStatus === s ? 'bg-white shadow-sm text-ink-primary' : 'text-ink-tertiary hover:text-ink-primary'}`}
+              <button
+                key={s}
+                onClick={() => setFilterStatus(s)}
+                className={`px-3 py-1.5 rounded-lg font-semibold transition ${
+                  filterStatus === s
+                    ? 'bg-blue-600 text-white shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
               >
-                {s === 'ALL' ? 'Todos' : s === 'IN_TRANSIT' ? 'En tránsito' : s === 'DELIVERED' ? 'Entregados' : 'Pendientes'}
+                {s === 'ALL' ? 'Todos' : s === 'IN_TRANSIT' ? 'En Tránsito' : s === 'DELIVERED' ? 'Entregados' : 'Pendientes'}
               </button>
             ))}
           </div>
@@ -235,33 +257,34 @@ export const AdminDashboard = () => {
 
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm">
-            <thead className="bg-surface-1 border-b border-surface-3 text-xs font-semibold text-ink-tertiary uppercase tracking-wide">
+            <thead className="bg-slate-50/50 border-b border-slate-200 text-xs font-semibold text-slate-500 uppercase tracking-wider">
               <tr>
-                <th className="px-5 py-3">Tracking</th>
-                <th className="px-5 py-3">Cliente</th>
-                <th className="px-5 py-3 hidden md:table-cell">Dirección</th>
-                <th className="px-5 py-3">Prioridad</th>
-                <th className="px-5 py-3 hidden sm:table-cell">Repartidor</th>
-                <th className="px-5 py-3">Estado</th>
-                <th className="px-5 py-3 text-right">Rastreo</th>
+                <th className="px-6 py-3.5">Guía / Tracking</th>
+                <th className="px-6 py-3.5">Cliente</th>
+                <th className="px-6 py-3.5 hidden md:table-cell">Dirección de Destino</th>
+                <th className="px-6 py-3.5">Prioridad</th>
+                <th className="px-6 py-3.5 hidden sm:table-cell">Repartidor</th>
+                <th className="px-6 py-3.5">Estado</th>
+                <th className="px-6 py-3.5 text-right">Rastreo</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-surface-3">
+            <tbody className="divide-y divide-slate-100">
               {filtered.length === 0 ? (
-                <tr><td colSpan={7} className="px-5 py-10 text-center text-sm text-ink-disabled">No hay órdenes para este filtro.</td></tr>
+                <tr><td colSpan={7} className="px-6 py-12 text-center text-sm text-slate-400">No hay órdenes para este filtro.</td></tr>
               ) : filtered.map(o => (
-                <tr key={o.id} className="hover:bg-surface-1 transition-colors">
-                  <td className="px-5 py-3.5 font-mono text-xs font-semibold text-brand-600">{o.tracking_number}</td>
-                  <td className="px-5 py-3.5 font-medium text-ink-primary">{o.client_name}</td>
-                  <td className="px-5 py-3.5 text-ink-tertiary text-xs hidden md:table-cell max-w-[200px] truncate">{o.delivery_address}</td>
-                  <td className="px-5 py-3.5"><PriorityBadge priority={o.priority} /></td>
-                  <td className="px-5 py-3.5 text-sm text-ink-secondary hidden sm:table-cell">{o.driver_name || <span className="text-ink-disabled">—</span>}</td>
-                  <td className="px-5 py-3.5"><StatusBadge status={o.status} /></td>
-                  <td className="px-5 py-3.5 text-right">
+                <tr key={o.id} className="hover:bg-slate-50/80 transition-colors">
+                  <td className="px-6 py-4 font-mono text-xs font-bold text-blue-600">{o.tracking_number}</td>
+                  <td className="px-6 py-4 font-medium text-slate-900">{o.client_name}</td>
+                  <td className="px-6 py-4 text-slate-500 text-xs hidden md:table-cell max-w-[220px] truncate">{o.delivery_address}</td>
+                  <td className="px-6 py-4"><PriorityBadge priority={o.priority} /></td>
+                  <td className="px-6 py-4 text-xs font-medium text-slate-700 hidden sm:table-cell">{o.driver_name || <span className="text-slate-400 italic">Sin asignar</span>}</td>
+                  <td className="px-6 py-4"><StatusBadge status={o.status} /></td>
+                  <td className="px-6 py-4 text-right">
                     <a href={`/track/${o.tracking_number}`} target="_blank" rel="noreferrer"
-                      className="inline-flex items-center gap-1 text-xs font-medium text-brand-600 hover:text-brand-700 hover:underline"
+                      className="inline-flex items-center gap-1 text-xs font-semibold text-blue-600 hover:text-blue-700 hover:underline"
                     >
-                      Ver <ArrowUpRight className="w-3 h-3" strokeWidth={2} />
+                      <span>Ver</span>
+                      <ArrowUpRight className="w-3.5 h-3.5" strokeWidth={2.2} />
                     </a>
                   </td>
                 </tr>

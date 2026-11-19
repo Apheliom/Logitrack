@@ -3,7 +3,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useSocket } from '../context/SocketContext';
 import { LogiTrackLogo } from './Brand/LogiTrackLogo';
-import { LogOut, Radio, Package, Navigation, LayoutDashboard, ChevronRight } from 'lucide-react';
+import { LogOut, Radio, Package, Navigation, LayoutDashboard, ShoppingBag } from 'lucide-react';
 
 export const Navbar = () => {
   const { user, logout } = useAuth();
@@ -43,8 +43,9 @@ export const Navbar = () => {
             <NavLink to="/admin" icon={LayoutDashboard} label="Panel de Control" />
           )}
           {(user.role === 'ADMIN' || user.role === 'DRIVER') && (
-            <NavLink to="/driver" icon={Navigation} label="Ruta de Repartidor" />
+            <NavLink to="/driver" icon={Navigation} label="Ruta Repartidor" />
           )}
+          <NavLink to="/store" icon={ShoppingBag} label="Tienda Express" />
           <NavLink to="/track/TRK-2026-001" icon={Package} label="Rastreo Cliente" />
         </nav>
 
