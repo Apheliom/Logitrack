@@ -130,12 +130,17 @@ class ImageForensicService {
     }
 
     let offset = 0;
-    while (offset < buffer.length - 68) {
+    while (offset < buffer.length - 4) {
       if (buffer[offset] === 0xFF && buffer[offset + 1] === 0xDB) {
         const len = buffer.readUInt16BE(offset + 2);
-        if (offset + 4 + 64 <= buffer.length) {
-          const tableBytes = buffer.subarray(offset + 4, offset + 4 + 64);
+        let p = offset + 4;
+        const markerEnd = Math.min(buffer.length, offset + 2 + len);
+        // Desempaquetado conforme a ISO/IEC 10918-1: cada tabla es 1 byte ID + 64 bytes de cuantización
+        // Dispositivos MediaTek / Tecno empaquetan múltiples tablas (Luminancia + Crominancia) en un solo bloque de 132 bytes
+        while (p + 65 <= markerEnd) {
+          const tableBytes = buffer.subarray(p + 1, p + 65);
           dqtTables.push(Array.from(tableBytes));
+          p += 65;
         }
         offset += 2 + len;
       } else {
@@ -155,26 +160,22 @@ class ImageForensicService {
     for (let i = 0; i < firstTable.length; i++) variance += Math.pow(firstTable[i] - mean, 2);
     const stdDev = Math.sqrt(variance / firstTable.length);
 
-    // Identificación de perfil forense de cuantización
+    // Identificación de perfil forense de cuantización conforme a ISO/IEC 10918-1
     let dqtProfile = 'ESTÁNDAR_ANALÓGICO';
     let isSyntheticDqt = false;
 
     if (dqtTables.length === 1) {
-      // 1 sola tabla DQT es característica clásica de generadores de difusión (PIL/SDXL/Canvas)
+      // 1 sola tabla DQT compartida es característica clásica de generadores de difusión (PIL/SDXL/Canvas)
       dqtProfile = 'MONO_TABLA_SINTÉTICA (IA / Canvas / Exportador Digital)';
       isSyntheticDqt = true;
-    } else if (stdDev < 5.0 && mean > 4.0) {
-      // Cuantización excesivamente uniforme (matriz casi plana)
-      dqtProfile = 'CUANTIZACIÓN_UNIFORME_IA (Renderizador No Analógico)';
+    } else if (stdDev === 0) {
+      // Matriz plana artificial constante (todos los coeficientes idénticos)
+      dqtProfile = 'CUANTIZACIÓN_PLANA_ARTIFICIAL (Generador Digital)';
       isSyntheticDqt = true;
     } else if (dqtTables.length >= 2) {
-      // Dos tablas (Luminancia y Crominancia) típicas de cámaras reales o libjpeg-turbo
-      if (mean >= 9.0 && mean <= 28.0 && stdDev >= 8.0) {
-        dqtProfile = 'COMPRESIÓN_DUAL_CÁMARA_O_WHATSAPP (Luminancia + Crominancia)';
-        isSyntheticDqt = false;
-      } else {
-        dqtProfile = 'COMPRESIÓN_DUAL_PERSONALIZADA';
-      }
+      // Dos o más tablas (Luminancia y Crominancia independientes): estándar analógico de hardware de cámara (Apple, Samsung, Tecno, Sony, Canon) y libjpeg-turbo
+      dqtProfile = 'COMPRESIÓN_DUAL_HARDWARE_CÁMARA (Luminancia + Crominancia Independientes)';
+      isSyntheticDqt = false;
     }
 
     return {
@@ -388,7 +389,7 @@ class ImageForensicService {
     const isScreenshotCandidate = this.detectDeviceScreenshot(filename, width, height, fftAnalysis.isPureUiVector, hasHardwareCamera);
 
     // Categorización de hallazgos
-    const inpaintFindings = aiFindings.filter(f => 
+    const inpaintFindings = aiFindings.filter(f =>
       f.type === 'ADOBE_FIREFLY_INPAINT' ||
       f.type === 'SAMSUNG_GALAXY_AI' ||
       f.type === 'GOOGLE_MAGIC_ERASER' ||

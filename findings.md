@@ -241,3 +241,17 @@ SecuriTrace es una plataforma de análisis forense digital multimedia, verificac
 
 ### 3. Restricción Estricta a Imágenes
 - El módulo de Visión Forense (`/api/forensics/analyze-file` y `FileAnalyzer.jsx`) fue restringido estrictamente a formatos de imagen (`JPEG`, `PNG`, `WEBP`, `HEIC`). Archivos de audio, video o documentos son rechazados con advertencia pericial guiando al usuario hacia sus módulos correspondientes.
+
+### 4. Corrección de Falsos Positivos en Dispositivos Tecno / MediaTek HAL
+- **Causa Raíz:** La especificación JPEG ISO/IEC 10918-1 B.2.4.1 permite múltiples tablas de cuantización empaquetadas en un único marcador `0xFF 0xDB`. Los procesadores MediaTek (teléfonos Tecno, Infinix, Xiaomi Redmi de gama de entrada) concatenan la tabla de Luminancia ($Q_Y$) y la tabla de Crominancia ($Q_C$) en un único bloque continuo de 132 bytes ($2 \text{ bytes de longitud} + 65 \text{ bytes } Q_Y + 65 \text{ bytes } Q_C$). El parser anterior extraía únicamente la primera tabla y reportaba erróneamente `dqtTables.length = 1`, disparando la alarma de `CUANTIZACIÓN_UNIFORME_IA`.
+- **Mitigación:** Implementación del desempaquetado iterativo `while (p + 65 <= markerEnd)` en `parseJpegQuantizationTables`, permitiendo extraer ambas matrices completas.
+- **Calibración de Varianza:** Se restringió `isSyntheticDqt` a matrices con dispersión nula (`stdDev === 0`) o generadas por difusores mono-tabla (`dqtTables.length === 1`), descartando falsas alarmas sobre capturas de sensores físicos reales de alta resolución.
+
+### 5. Doctrina Forense Pericial: Comprobantes Digitales de Pago Móvil
+- **Naturaleza Técnica de un Pago Móvil Legítimo:**
+  - Un comprobante de Pago Móvil generado por la aplicación bancaria es un volcado digital del *Framebuffer* del sistema operativo (interfaz gráfica renderizada por vectores y fuentes del sistema).
+  - **No es una imagen generada por IA:** Clasificar una captura legítima de app bancaria como "IA" constituiría un falso positivo crítico.
+  - **Clasificación Correcta:** `CAPTURADEPANTALLA_DISPOSITIVO` (Riesgo $\le 0.0\%$, Autenticidad $\ge 99.0\%$).
+- **Detección de Fraude en Comprobantes Adulterados:**
+  - **Alteración Manual (Photoshop / Canva / Montaje de texto o montos):** Al incrustar texto falso sobre el comprobante o alterar números/referencias, la re-compresión localizada y la disparidad de cuantización delatan la manipulación mediante análisis ELA y discontinuidad de gradientes $\rightarrow$ `ALTERACION_MANUAL_RETOQUE` (Riesgo $\ge 80\%$).
+  - **Generación Sintética por IA (Difusor / Inpainting):** Si el comprobante o parte de él fue fabricado con Stable Diffusion / Flux / DALL-E, el análisis espectral 2D FFT detecta los picos armónicos de retícula de convolución y fuentes deformadas $\rightarrow$ `SINTETICO_IA_GENERATIVA` o `FOTO_REAL_MANIPULADA_CON_IA` (Riesgo $\ge 95\%$).

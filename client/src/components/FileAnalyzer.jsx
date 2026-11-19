@@ -559,9 +559,9 @@ export default function FileAnalyzer() {
               )}
 
               {/* Geolocalización Pericial & Telemetría Satelital */}
-              <ForensicGeoMap 
+              <ForensicGeoMap
                 geoData={
-                  fileAnalysisResult.geoComparison || 
+                  fileAnalysisResult.geoComparison ||
                   (fileAnalysisResult.metadata?.gpsLatitude ? {
                     hasGpsData: true,
                     hasPhotoGps: true,
@@ -689,8 +689,8 @@ export default function FileAnalyzer() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
                   {/* CANAL 1: INTELIGENCIA ARTIFICIAL (IA GENERATIVA / DEEPFAKE) */}
                   <div className={`p-4 rounded-2xl border transition-all ${fileAnalysisResult.aiAnalysis?.isAiGenerated
-                      ? 'bg-purple-950/30 border-purple-500/50 shadow-lg shadow-purple-950/40'
-                      : 'bg-obsidian-950/60 border-white/[0.06]'
+                    ? 'bg-purple-950/30 border-purple-500/50 shadow-lg shadow-purple-950/40'
+                    : 'bg-obsidian-950/60 border-white/[0.06]'
                     } space-y-2.5`}>
                     <div className="flex items-center justify-between border-b border-white/[0.06] pb-2">
                       <span className="text-[11px] font-mono text-purple-400 font-bold flex items-center space-x-1.5">
@@ -698,8 +698,8 @@ export default function FileAnalyzer() {
                         <span>CANAL IA GENERATIVA</span>
                       </span>
                       <span className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded-md ${fileAnalysisResult.aiAnalysis?.isAiGenerated
-                          ? 'bg-purple-900/60 text-purple-200 border border-purple-500/40'
-                          : 'bg-emerald-950/60 text-emerald-300 border border-emerald-500/30'
+                        ? 'bg-purple-900/60 text-purple-200 border border-purple-500/40'
+                        : 'bg-emerald-950/60 text-emerald-300 border border-emerald-500/30'
                         }`}>
                         {fileAnalysisResult.aiAnalysis?.isAiGenerated
                           ? `IA DETECTADA (${fileAnalysisResult.aiAnalysis.score}%)`
@@ -732,8 +732,8 @@ export default function FileAnalyzer() {
 
                   {/* CANAL 2: EDICIÓN MANUAL HUMANA (PHOTOSHOP / RETOQUE GRÁFICO) */}
                   <div className={`p-4 rounded-2xl border transition-all ${fileAnalysisResult.manualEditAnalysis?.isManuallyEdited
-                      ? 'bg-amber-950/30 border-amber-500/50 shadow-lg shadow-amber-950/40'
-                      : 'bg-obsidian-950/60 border-white/[0.06]'
+                    ? 'bg-amber-950/30 border-amber-500/50 shadow-lg shadow-amber-950/40'
+                    : 'bg-obsidian-950/60 border-white/[0.06]'
                     } space-y-2.5`}>
                     <div className="flex items-center justify-between border-b border-white/[0.06] pb-2">
                       <span className="text-[11px] font-mono text-amber-400 font-bold flex items-center space-x-1.5">
@@ -741,8 +741,8 @@ export default function FileAnalyzer() {
                         <span>CANAL EDICIÓN MANUAL</span>
                       </span>
                       <span className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded-md ${fileAnalysisResult.manualEditAnalysis?.isManuallyEdited
-                          ? 'bg-amber-900/60 text-amber-200 border border-amber-500/40'
-                          : 'bg-emerald-950/60 text-emerald-300 border border-emerald-500/30'
+                        ? 'bg-amber-900/60 text-amber-200 border border-amber-500/40'
+                        : 'bg-emerald-950/60 text-emerald-300 border border-emerald-500/30'
                         }`}>
                         {fileAnalysisResult.manualEditAnalysis?.isManuallyEdited
                           ? `EDICIÓN MANUAL (${fileAnalysisResult.manualEditAnalysis.score}%)`
