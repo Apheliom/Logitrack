@@ -32,10 +32,26 @@ export const LoginPage = () => {
     }
   };
 
-  // Acceso rápido con credenciales semilla precargadas
-  const handleQuickLogin = (demoEmail, demoPass) => {
+  // Acceso rápido con 1 solo clic: rellena y entra de inmediato
+  const handleQuickLogin = async (demoEmail, demoPass) => {
     setEmail(demoEmail);
     setPassword(demoPass);
+    setError('');
+    setLoading(true);
+    try {
+      const loggedUser = await login(demoEmail, demoPass);
+      if (loggedUser.role === 'ADMIN') {
+        navigate('/admin');
+      } else if (loggedUser.role === 'DRIVER') {
+        navigate('/driver');
+      } else {
+        navigate('/track/TRK-2026-001');
+      }
+    } catch (err) {
+      setError(err.message || 'Error en las credenciales.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (

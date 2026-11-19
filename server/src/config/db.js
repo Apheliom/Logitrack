@@ -2,7 +2,12 @@ const { Pool } = require('pg');
 require('dotenv').config();
 
 const isProduction = process.env.NODE_ENV === 'production';
-const connectionString = process.env.DATABASE_URL;
+let connectionString = process.env.DATABASE_URL || process.env.database || process.env.DATABASE;
+
+// Limpieza automática por si se colocaron corchetes [password] por error
+if (connectionString && connectionString.includes(':[')) {
+  connectionString = connectionString.replace(/:\[([^\]]+)\]@/, ':$1@');
+}
 
 // Supabase requiere SSL: rejectUnauthorized false cuando se conecta desde clientes externos
 const isSupabase = connectionString && (
