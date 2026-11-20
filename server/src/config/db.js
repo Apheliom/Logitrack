@@ -11,7 +11,7 @@ if (connectionString && connectionString.includes(':[')) {
 
 // Supabase requiere SSL: rejectUnauthorized false cuando se conecta desde clientes externos
 const isSupabase = connectionString && (
-  connectionString.includes('supabase.co') || 
+  connectionString.includes('supabase.co') ||
   connectionString.includes('pooler.supabase.com')
 );
 

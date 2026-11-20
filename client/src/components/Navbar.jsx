@@ -74,7 +74,7 @@ export const Navbar = () => {
               {user.full_name?.charAt(0) || 'U'}
             </div>
             <div className="hidden lg:block text-left">
-              <div className="text-xs font-semibold text-slate-800 leading-tight truncate max-w-[120px]">
+              <div className="text-xs font-semibold text-slate-800 leading-tight truncate max-w-[240px]">
                 {user.full_name}
               </div>
               <div className="text-[10px] text-slate-500 font-medium">

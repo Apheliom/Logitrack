@@ -1,3 +1,4 @@
+const bcrypt = require('bcryptjs');
 const db = require('../config/db');
 
 const getAllDrivers = async (req, res) => {
@@ -167,7 +168,16 @@ const getDriversAdminOverview = async (req, res) => {
 const updateDriverAdminProfile = async (req, res) => {
   try {
     const { driverId } = req.params;
-    const { full_name, phone, vehicle_type, license_plate, status, is_available } = req.body;
+    const {
+      full_name,
+      email,
+      password,
+      phone,
+      vehicle_type,
+      license_plate,
+      status,
+      is_available
+    } = req.body;
 
     const driverCheck = await db.query(`SELECT id, user_id FROM drivers WHERE id = $1`, [driverId]);
     if (driverCheck.rows.length === 0) {
@@ -175,17 +185,53 @@ const updateDriverAdminProfile = async (req, res) => {
     }
     const userId = driverCheck.rows[0].user_id;
 
-    if (full_name !== undefined || phone !== undefined) {
-      await db.query(
-        `UPDATE users
-         SET full_name = COALESCE($1, full_name),
-             phone = COALESCE($2, phone),
-             updated_at = NOW()
-         WHERE id = $3`,
-        [full_name || null, phone || null, userId]
+    // Verificar unicidad de correo si se envía cambio de email
+    if (email && email.trim()) {
+      const cleanEmail = email.toLowerCase().trim();
+      const emailCheck = await db.query(
+        `SELECT id FROM users WHERE email = $1 AND id <> $2`,
+        [cleanEmail, userId]
       );
+      if (emailCheck.rows.length > 0) {
+        return res.status(409).json({
+          success: false,
+          message: 'El correo electrónico ya se encuentra registrado por otro usuario.'
+        });
+      }
     }
 
+    // Hashear nueva contraseña si se proporciona
+    let passwordHash = null;
+    if (password && password.trim().length > 0) {
+      if (password.trim().length < 6) {
+        return res.status(400).json({
+          success: false,
+          message: 'La contraseña debe contener al menos 6 caracteres.'
+        });
+      }
+      const salt = await bcrypt.genSalt(10);
+      passwordHash = await bcrypt.hash(password.trim(), salt);
+    }
+
+    // Actualizar datos del usuario asociado al conductor
+    await db.query(
+      `UPDATE users
+       SET full_name = COALESCE($1, full_name),
+           email = COALESCE($2, email),
+           phone = COALESCE($3, phone),
+           password_hash = COALESCE($4, password_hash),
+           updated_at = NOW()
+       WHERE id = $5`,
+      [
+        full_name ? full_name.trim() : null,
+        email ? email.toLowerCase().trim() : null,
+        phone !== undefined ? phone : null,
+        passwordHash,
+        userId
+      ]
+    );
+
+    // Actualizar datos operativos del conductor
     const updatedDriver = await db.query(
       `UPDATE drivers
        SET vehicle_type = COALESCE($1, vehicle_type),
@@ -195,12 +241,18 @@ const updateDriverAdminProfile = async (req, res) => {
            updated_at = NOW()
        WHERE id = $5
        RETURNING *`,
-      [vehicle_type || null, license_plate || null, status || null, is_available !== undefined ? is_available : null, driverId]
+      [
+        vehicle_type || null,
+        license_plate || null,
+        status || null,
+        is_available !== undefined ? is_available : null,
+        driverId
+      ]
     );
 
     return res.status(200).json({
       success: true,
-      message: 'Perfil de conductor actualizado con éxito.',
+      message: 'Credenciales de acceso y perfil de conductor actualizados con éxito.',
       driver: updatedDriver.rows[0]
     });
   } catch (err) {

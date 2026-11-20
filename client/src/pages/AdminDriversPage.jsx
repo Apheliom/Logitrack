@@ -3,7 +3,7 @@ import { api } from '../api/client';
 import {
   Truck, User, Phone, Star, CheckCircle2, Clock,
   Edit3, MessageSquare, AlertCircle, RotateCw, X,
-  Shield, Check, ArrowRight
+  Shield, Check, ArrowRight, Mail, Key
 } from 'lucide-react';
 import { MetricCard } from '../components/UI/MetricCard';
 import { Badge } from '../components/UI/Badge';
@@ -19,6 +19,8 @@ export const AdminDriversPage = () => {
   // Formulario de edición
   const [formData, setFormData] = useState({
     full_name: '',
+    email: '',
+    password: '',
     phone: '',
     vehicle_type: 'MOTORCYCLE',
     license_plate: '',
@@ -49,6 +51,8 @@ export const AdminDriversPage = () => {
     setEditingDriver(driver);
     setFormData({
       full_name: driver.full_name || '',
+      email: driver.email || '',
+      password: '',
       phone: driver.phone || '',
       vehicle_type: driver.vehicle_type || 'MOTORCYCLE',
       license_plate: driver.license_plate || '',
@@ -124,32 +128,32 @@ export const AdminDriversPage = () => {
       {/* KPI Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <MetricCard
-          label="Total Conductores"
+          title="Total Conductores"
           value={totalDrivers}
           icon={User}
-          color="blue"
-          sublabel={`${activeDrivers} con disponibilidad activa`}
+          variant="blue"
+          subtitle={`${activeDrivers} con disponibilidad activa`}
         />
         <MetricCard
-          label="En Ruta Ahora"
+          title="En Ruta Ahora"
           value={inRouteDrivers}
           icon={Truck}
-          color="indigo"
-          sublabel="Despachos en tránsito"
+          variant="indigo"
+          subtitle="Despachos en tránsito"
         />
         <MetricCard
-          label="Entregas Exitosas"
+          title="Entregas Exitosas"
           value={totalDelivered}
           icon={CheckCircle2}
-          color="emerald"
-          sublabel="Historial acumulado de flota"
+          variant="emerald"
+          subtitle="Historial acumulado de flota"
         />
         <MetricCard
-          label="Calificación Promedio"
-          value={fleetAvgRating > 0 ? `${fleetAvgRating} / 5` : 'N/A'}
+          title="Calificación Promedio"
+          value={Number(fleetAvgRating) > 0 ? `${fleetAvgRating} / 5` : 'N/A'}
           icon={Star}
-          color="amber"
-          sublabel={`${reviews.length} reseñas registradas`}
+          variant="amber"
+          subtitle={`${reviews.length} reseñas registradas`}
         />
       </div>
 
@@ -317,7 +321,7 @@ export const AdminDriversPage = () => {
       {/* Modal de Modificación de Datos de Conductor */}
       {editingDriver && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs">
-          <div className="bg-white border border-slate-200 rounded-3xl max-w-lg w-full p-6 sm:p-8 shadow-xl relative animate-in fade-in zoom-in-95 duration-150">
+          <div className="bg-white border border-slate-200 rounded-3xl max-w-xl w-full p-6 sm:p-8 shadow-xl relative animate-in fade-in zoom-in-95 duration-150 max-h-[90vh] overflow-y-auto">
             <button
               onClick={closeEditModal}
               className="absolute top-6 right-6 text-slate-400 hover:text-slate-700 p-1.5 rounded-full hover:bg-slate-100 transition"
@@ -331,7 +335,7 @@ export const AdminDriversPage = () => {
               </div>
               <div>
                 <h3 className="text-lg font-bold text-slate-900">Modificar Datos de Conductor</h3>
-                <p className="text-xs text-slate-500">Actualizar información operativa y credenciales de flota</p>
+                <p className="text-xs text-slate-500">Actualizar credenciales de acceso, vehículo y estado operativo</p>
               </div>
             </div>
 
@@ -347,35 +351,82 @@ export const AdminDriversPage = () => {
             )}
 
             <form onSubmit={handleSaveDriver} className="space-y-4">
-              <div>
-                <label className="text-xs font-semibold text-slate-700 block mb-1.5">Nombre Completo</label>
-                <input
-                  type="text"
-                  required
-                  value={formData.full_name}
-                  onChange={(e) => setFormData({ ...formData, full_name: e.target.value })}
-                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
-                />
+              {/* Sección 1: Credenciales de Login */}
+              <div className="p-4 bg-slate-50/80 rounded-2xl border border-slate-200/80 space-y-3">
+                <span className="text-[11px] font-bold text-blue-700 uppercase tracking-wider block">
+                  Credenciales de Acceso
+                </span>
+                
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs font-semibold text-slate-700 block mb-1">
+                      Correo Electrónico *
+                    </label>
+                    <div className="relative">
+                      <Mail className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                      <input
+                        type="email"
+                        required
+                        value={formData.email}
+                        onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                        placeholder="conductor@logitrack.com"
+                        className="w-full pl-8 pr-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-medium text-slate-900 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-semibold text-slate-700 block mb-1">
+                      Nueva Contraseña
+                    </label>
+                    <div className="relative">
+                      <Key className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                      <input
+                        type="password"
+                        value={formData.password}
+                        onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                        placeholder="Conservar actual (en blanco)"
+                        minLength={6}
+                        className="w-full pl-8 pr-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-medium text-slate-900 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                      />
+                    </div>
+                  </div>
+                </div>
               </div>
 
-              <div>
-                <label className="text-xs font-semibold text-slate-700 block mb-1.5">Teléfono de Contacto</label>
-                <input
-                  type="text"
-                  value={formData.phone}
-                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                  placeholder="+58 412 1234567"
-                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
+              {/* Sección 2: Información Personal */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="text-xs font-semibold text-slate-700 block mb-1.5">Tipo de Vehículo</label>
+                  <label className="text-xs font-semibold text-slate-700 block mb-1">Nombre Completo *</label>
+                  <input
+                    type="text"
+                    required
+                    value={formData.full_name}
+                    onChange={(e) => setFormData({ ...formData, full_name: e.target.value })}
+                    className="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-900 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs font-semibold text-slate-700 block mb-1">Teléfono Móvil</label>
+                  <input
+                    type="text"
+                    value={formData.phone}
+                    onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                    placeholder="+58 412 1234567"
+                    className="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-900 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                  />
+                </div>
+              </div>
+
+              {/* Sección 3: Vehículo */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-semibold text-slate-700 block mb-1">Tipo de Vehículo</label>
                   <select
                     value={formData.vehicle_type}
                     onChange={(e) => setFormData({ ...formData, vehicle_type: e.target.value })}
-                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-900 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
                   >
                     <option value="MOTORCYCLE">Motocicleta</option>
                     <option value="VAN">Furgoneta / Van</option>
@@ -385,37 +436,38 @@ export const AdminDriversPage = () => {
                 </div>
 
                 <div>
-                  <label className="text-xs font-semibold text-slate-700 block mb-1.5">Placa / Matrícula</label>
+                  <label className="text-xs font-semibold text-slate-700 block mb-1">Placa / Matrícula</label>
                   <input
                     type="text"
                     value={formData.license_plate}
                     onChange={(e) => setFormData({ ...formData, license_plate: e.target.value.toUpperCase() })}
                     placeholder="AA1B23C"
-                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 uppercase"
+                    className="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-900 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 uppercase"
                   />
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4 pt-1">
+              {/* Sección 4: Turno y Disponibilidad */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
                 <div>
-                  <label className="text-xs font-semibold text-slate-700 block mb-1.5">Estado Operativo</label>
+                  <label className="text-xs font-semibold text-slate-700 block mb-1">Estado de Turno</label>
                   <select
                     value={formData.status}
                     onChange={(e) => setFormData({ ...formData, status: e.target.value })}
-                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-900 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
                   >
-                    <option value="IDLE">Disponible / Espera</option>
+                    <option value="IDLE">Disponible / En Espera</option>
                     <option value="ON_DELIVERY">En Entrega / En Ruta</option>
                     <option value="OFFLINE">Fuera de Turno</option>
                   </select>
                 </div>
 
                 <div>
-                  <label className="text-xs font-semibold text-slate-700 block mb-1.5">Disponibilidad en Plataforma</label>
+                  <label className="text-xs font-semibold text-slate-700 block mb-1">Disponibilidad</label>
                   <select
                     value={formData.is_available ? '1' : '0'}
                     onChange={(e) => setFormData({ ...formData, is_available: e.target.value === '1' })}
-                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-900 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
                   >
                     <option value="1">Habilitado para Despacho</option>
                     <option value="0">Deshabilitado Temporalmente</option>

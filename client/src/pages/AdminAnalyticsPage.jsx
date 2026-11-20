@@ -85,7 +85,6 @@ export const AdminAnalyticsPage = () => {
           value={`$${metrics.totalRevenue.toFixed(2)}`}
           icon={DollarSign}
           variant="emerald"
-          trend="+18.4%"
           subtitle="Volumen de ventas directas"
         />
         <MetricCard
