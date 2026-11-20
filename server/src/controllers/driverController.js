@@ -131,17 +131,18 @@ const getDriversAdminOverview = async (req, res) => {
               COALESCE(COUNT(o.client_rating), 0)::integer AS total_reviews_count
        FROM drivers d
        INNER JOIN users u ON d.user_id = u.id
-       LEFT JOIN orders o ON o.driver_id = d.id
+       LEFT JOIN orders o ON o.assigned_driver_id = d.id
        GROUP BY d.id, u.id
        ORDER BY d.is_available DESC, u.full_name ASC`
     );
 
     const reviewsResult = await db.query(
-      `SELECT o.id, o.tracking_number, o.driver_id, o.client_rating, o.client_feedback,
-              o.recipient_name, o.created_at, o.updated_at,
+      `SELECT o.id, o.tracking_number, o.assigned_driver_id AS driver_id,
+              o.client_rating, o.client_feedback, o.client_name AS recipient_name,
+              o.created_at, o.updated_at,
               u.full_name AS driver_name
        FROM orders o
-       INNER JOIN drivers d ON o.driver_id = d.id
+       INNER JOIN drivers d ON o.assigned_driver_id = d.id
        INNER JOIN users u ON d.user_id = u.id
        WHERE o.client_rating IS NOT NULL OR (o.client_feedback IS NOT NULL AND o.client_feedback <> '')
        ORDER BY o.updated_at DESC

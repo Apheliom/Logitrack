@@ -67,23 +67,6 @@ export const Navbar = () => {
 
         {/* Right side status and profile */}
         <div className="flex items-center gap-3">
-          {/* Real-time Telemetry Pill */}
-          <div
-            className={`flex items-center gap-2 px-2.5 py-1 rounded-full text-xs font-medium border ${
-              isConnected
-                ? 'bg-emerald-50 text-emerald-700 border-emerald-200/70'
-                : 'bg-rose-50 text-rose-700 border-rose-200/70'
-            }`}
-          >
-            <span
-              className={`w-2 h-2 rounded-full ${
-                isConnected ? 'bg-emerald-500 animate-pulse' : 'bg-rose-500'
-              }`}
-            />
-            <span className="hidden sm:inline">{isConnected ? 'Telemetría Activa' : 'Offline'}</span>
-          </div>
-
-          <div className="h-6 w-px bg-slate-200" />
 
           {/* User profile */}
           <div className="flex items-center gap-2.5">

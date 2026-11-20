@@ -560,6 +560,62 @@ const submitOrderFeedback = async (req, res) => {
   }
 };
 
+// Estadísticas reales del catálogo express (Más Vendido / Recomendado basado en BD)
+const getProductCatalogStats = async (req, res) => {
+  try {
+    const salesResult = await db.query(`
+      SELECT item->>'id' AS product_id,
+             item->>'name' AS product_name,
+             SUM(COALESCE((item->>'quantity')::integer, 1)) AS total_sold
+      FROM orders,
+           jsonb_array_elements(order_items) AS item
+      WHERE status <> 'FAILED'
+      GROUP BY item->>'id', item->>'name'
+      ORDER BY total_sold DESC
+    `);
+
+    const ratingResult = await db.query(`
+      SELECT item->>'id' AS product_id,
+             AVG(o.client_rating) AS avg_rating,
+             COUNT(o.client_rating) AS review_count
+      FROM orders o,
+           jsonb_array_elements(o.order_items) AS item
+      WHERE o.client_rating IS NOT NULL
+      GROUP BY item->>'id'
+      HAVING AVG(o.client_rating) >= 4.0
+      ORDER BY avg_rating DESC, review_count DESC
+    `);
+
+    const topSelling = salesResult.rows.length > 0 && Number(salesResult.rows[0].total_sold) > 0
+      ? salesResult.rows[0].product_id
+      : null;
+
+    let recommended = null;
+    if (ratingResult.rows.length > 0) {
+      recommended = ratingResult.rows[0].product_id;
+    } else if (salesResult.rows.length > 1 && Number(salesResult.rows[1].total_sold) > 0) {
+      recommended = salesResult.rows[1].product_id;
+    }
+
+    return res.status(200).json({
+      success: true,
+      stats: {
+        topSellingId: topSelling,
+        topSellingUnits: salesResult.rows[0] ? Number(salesResult.rows[0].total_sold) : 0,
+        recommendedId: recommended,
+        salesByProduct: salesResult.rows
+      }
+    });
+  } catch (err) {
+    console.error('[OrderController.getProductCatalogStats Error]', err);
+    return res.status(500).json({
+      success: false,
+      message: 'Error al consultar estadísticas de productos del catálogo.',
+      error: err.message
+    });
+  }
+};
+
 module.exports = {
   getAllOrders,
   createOrder,
@@ -568,5 +624,6 @@ module.exports = {
   claimOrder,
   getMyOrders,
   getAnalyticsAndAudit,
-  submitOrderFeedback
+  submitOrderFeedback,
+  getProductCatalogStats
 };

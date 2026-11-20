@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../api/client';
 import { useAuth } from '../context/AuthContext';
@@ -16,10 +16,12 @@ import {
   Package,
   Sparkles,
   Crosshair,
-  Clock
+  Clock,
+  Star,
+  Flame
 } from 'lucide-react';
 
-// Catálogo de productos con fotografías reales de alta calidad (CERO EMOJIS)
+// Catálogo de productos con fotografías reales de alta calidad (CERO EMOJIS, insignias 100% dinámicas desde BD)
 const PRODUCTS = [
   {
     id: 'prod-01',
@@ -27,7 +29,6 @@ const PRODUCTS = [
     category: 'Tecnología',
     price: 49.00,
     desc: 'Switches silenciosos, conexión Bluetooth dual y batería de larga duración.',
-    badge: 'Más Vendido',
     image: 'https://images.unsplash.com/photo-1587829741301-dc798b83add3?auto=format&fit=crop&w=500&q=80'
   },
   {
@@ -36,7 +37,6 @@ const PRODUCTS = [
     category: 'Salud & Cuidado',
     price: 28.50,
     desc: '45 insumos médicos esenciales de respuesta rápida en estuche impermeable.',
-    badge: 'Esencial',
     image: 'https://images.unsplash.com/photo-1603398938378-e54eab446dde?auto=format&fit=crop&w=500&q=80'
   },
   {
@@ -45,7 +45,6 @@ const PRODUCTS = [
     category: 'Gourmet',
     price: 18.00,
     desc: 'Granos arábica seleccionados con tueste medio y notas de caramelo.',
-    badge: 'Popular',
     image: 'https://images.unsplash.com/photo-1559056199-641a0ac8b55e?auto=format&fit=crop&w=500&q=80'
   },
   {
@@ -54,7 +53,6 @@ const PRODUCTS = [
     category: 'Audio',
     price: 68.00,
     desc: 'Cancelación activa de ruido ambiental, micrófono de alta definición y 30h de autonomía.',
-    badge: 'Oferta',
     image: 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?auto=format&fit=crop&w=500&q=80'
   },
   {
@@ -63,7 +61,6 @@ const PRODUCTS = [
     category: 'Ferretería',
     price: 32.00,
     desc: 'Puntas imantadas de aleación S2 para electrónica, telefonía y mantenimiento.',
-    badge: 'Recomendado',
     image: 'https://images.unsplash.com/photo-1581783342308-f792dbdd27c5?auto=format&fit=crop&w=500&q=80'
   },
   {
@@ -72,7 +69,6 @@ const PRODUCTS = [
     category: 'Accesorios',
     price: 24.00,
     desc: 'Aislamiento al vacío que conserva bebidas frías 24h y calientes 12h sin condensación.',
-    badge: 'Eco',
     image: 'https://images.unsplash.com/photo-1602143407151-7111542de6e8?auto=format&fit=crop&w=500&q=80'
   }
 ];
@@ -85,6 +81,22 @@ export const CustomerStorePage = () => {
   const [loading, setLoading] = useState(false);
   const [locatingGps, setLocatingGps] = useState(false);
   const [error, setError] = useState(null);
+  const [catalogStats, setCatalogStats] = useState(null);
+
+  // Consulta en tiempo real de estadísticas de productos para badges verdaderos
+  useEffect(() => {
+    const fetchCatalogStats = async () => {
+      try {
+        const res = await api.get('/orders/store/product-stats');
+        if (res.success && res.stats) {
+          setCatalogStats(res.stats);
+        }
+      } catch (err) {
+        // Silencioso: no interrumpe la navegación
+      }
+    };
+    fetchCatalogStats();
+  }, []);
 
   // Formulario del cliente con auto-completado si está autenticado
   const [customerData, setCustomerData] = useState({
@@ -266,9 +278,19 @@ export const CustomerStorePage = () => {
                   <div className="absolute top-3 left-3 bg-white/90 backdrop-blur-xs px-2.5 py-0.5 rounded-full text-[10px] font-bold text-slate-700 border border-slate-200/80">
                     {product.category}
                   </div>
-                  <div className="absolute top-3 right-3 bg-blue-600 text-white px-2.5 py-0.5 rounded-full text-[10px] font-bold shadow-xs">
-                    {product.badge}
-                  </div>
+                  
+                  {/* Insignia calculada 100% en tiempo real desde la Base de Datos */}
+                  {catalogStats?.topSellingId === product.id && Number(catalogStats?.topSellingUnits) > 0 ? (
+                    <div className="absolute top-3 right-3 bg-amber-500 text-white px-2.5 py-0.5 rounded-full text-[10px] font-bold shadow-xs flex items-center gap-1">
+                      <Flame className="w-3 h-3 fill-current" />
+                      <span>Más Vendido ({catalogStats.topSellingUnits} uds.)</span>
+                    </div>
+                  ) : catalogStats?.recommendedId === product.id ? (
+                    <div className="absolute top-3 right-3 bg-emerald-600 text-white px-2.5 py-0.5 rounded-full text-[10px] font-bold shadow-xs flex items-center gap-1">
+                      <Star className="w-3 h-3 fill-current" />
+                      <span>Recomendado</span>
+                    </div>
+                  ) : null}
                 </div>
 
                 {/* Details */}

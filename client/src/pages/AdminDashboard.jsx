@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../api/client';
 import { useSocket } from '../context/SocketContext';
@@ -8,7 +8,7 @@ import { Badge } from '../components/UI/Badge';
 import { MetricCard } from '../components/UI/MetricCard';
 import {
   Package, Truck, CheckCircle2, Clock, Play, Square,
-  Plus, RefreshCw, ArrowUpRight, ArrowRight
+  Plus, RefreshCw, ArrowUpRight, ArrowRight, Search, Filter, ShoppingBag
 } from 'lucide-react';
 
 export const AdminDashboard = () => {
@@ -19,6 +19,8 @@ export const AdminDashboard = () => {
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
   const [filterStatus, setFilterStatus] = useState('ALL');
+  const [mapFilterDriver, setMapFilterDriver] = useState('ALL');
+  const [mapSearch, setMapSearch] = useState('');
   const { socket } = useSocket();
 
   const loadAll = async () => {
@@ -62,6 +64,38 @@ export const AdminDashboard = () => {
 
   const filtered = orders.filter(o => filterStatus === 'ALL' || o.status === filterStatus);
 
+  // Filtros dinámicos para el mapa (por estado, chofer y búsqueda de producto/cliente)
+  const mapFilteredOrders = useMemo(() => {
+    return orders.filter(o => {
+      // Filtro por estado
+      if (filterStatus !== 'ALL' && o.status !== filterStatus) return false;
+      // Filtro por chofer asignado
+      if (mapFilterDriver === 'UNASSIGNED') {
+        if (o.assigned_driver_id) return false;
+      } else if (mapFilterDriver !== 'ALL') {
+        if (o.assigned_driver_id !== mapFilterDriver) return false;
+      }
+      // Filtro por producto, cliente, guía o dirección
+      if (mapSearch.trim()) {
+        const q = mapSearch.toLowerCase();
+        const matchesClient = o.client_name?.toLowerCase().includes(q);
+        const matchesTracking = o.tracking_number?.toLowerCase().includes(q);
+        const matchesAddress = o.delivery_address?.toLowerCase().includes(q);
+        const matchesProduct = Array.isArray(o.order_items) && o.order_items.some(it =>
+          (it.name && it.name.toLowerCase().includes(q)) || (it.category && it.category.toLowerCase().includes(q))
+        );
+        if (!matchesClient && !matchesTracking && !matchesAddress && !matchesProduct) return false;
+      }
+      return true;
+    });
+  }, [orders, filterStatus, mapFilterDriver, mapSearch]);
+
+  const mapFilteredDrivers = useMemo(() => {
+    if (mapFilterDriver === 'UNASSIGNED') return [];
+    if (mapFilterDriver === 'ALL') return drivers;
+    return drivers.filter(d => d.id === mapFilterDriver);
+  }, [drivers, mapFilterDriver]);
+
   return (
     <div className="max-w-screen-xl mx-auto px-5 py-6 space-y-6">
 
@@ -98,16 +132,69 @@ export const AdminDashboard = () => {
 
         {/* Map */}
         <div className="lg:col-span-2 space-y-3">
-          <div className="flex items-center justify-between px-1">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 px-1">
             <h2 className="text-sm font-bold text-slate-900 flex items-center gap-2">
               <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
               <span>Mapa de Flota en Tiempo Real</span>
             </h2>
-            <span className="text-xs font-medium text-slate-500 bg-white px-2.5 py-1 rounded-full border border-slate-200 shadow-2xs">
-              {drivers.length} Vehículos en radar
-            </span>
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] font-semibold text-slate-500 bg-white px-2.5 py-1 rounded-full border border-slate-200 shadow-2xs">
+                {mapFilteredOrders.length} Paradas · {mapFilteredDrivers.length} Conductores
+              </span>
+            </div>
           </div>
-          <LiveFleetMap orders={orders} drivers={drivers} activeRoute={activeRoute} center={[10.0305, -69.2635]} zoom={13} />
+
+          {/* Barra de Filtros Interactiva (Pedidos, Choferes, Productos) */}
+          <div className="bg-white border border-slate-200/90 rounded-2xl p-3 shadow-2xs grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+            {/* Buscador de Producto / Cliente / Guía */}
+            <div className="relative">
+              <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                placeholder="Filtrar por producto, cliente o guía..."
+                value={mapSearch}
+                onChange={(e) => setMapSearch(e.target.value)}
+                className="w-full pl-8 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+              />
+            </div>
+
+            {/* Selector de Conductor */}
+            <div className="relative">
+              <select
+                value={mapFilterDriver}
+                onChange={(e) => setMapFilterDriver(e.target.value)}
+                className="w-full px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-700 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+              >
+                <option value="ALL">Todos los Choferes ({drivers.length})</option>
+                {drivers.map(d => (
+                  <option key={d.id} value={d.id}>{d.full_name} ({d.vehicle_type})</option>
+                ))}
+                <option value="UNASSIGNED">Sin Conductor Asignado</option>
+              </select>
+            </div>
+
+            {/* Selector de Estado de Pedido */}
+            <div className="relative">
+              <select
+                value={filterStatus}
+                onChange={(e) => setFilterStatus(e.target.value)}
+                className="w-full px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-700 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+              >
+                <option value="ALL">Todos los Estados</option>
+                <option value="PENDING">Pendientes de Despacho</option>
+                <option value="IN_TRANSIT">En Tránsito / Ruta</option>
+                <option value="DELIVERED">Entregados</option>
+              </select>
+            </div>
+          </div>
+
+          <LiveFleetMap
+            orders={mapFilteredOrders}
+            drivers={mapFilteredDrivers}
+            activeRoute={activeRoute}
+            center={[10.0305, -69.2635]}
+            zoom={13}
+          />
         </div>
 
         {/* Right column */}

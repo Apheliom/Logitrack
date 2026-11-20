@@ -20,9 +20,9 @@ export const AdminDriversPage = () => {
   const [formData, setFormData] = useState({
     full_name: '',
     phone: '',
-    vehicle_type: 'MOTO',
+    vehicle_type: 'MOTORCYCLE',
     license_plate: '',
-    status: 'AVAILABLE',
+    status: 'IDLE',
     is_available: true
   });
 
@@ -50,9 +50,9 @@ export const AdminDriversPage = () => {
     setFormData({
       full_name: driver.full_name || '',
       phone: driver.phone || '',
-      vehicle_type: driver.vehicle_type || 'MOTO',
+      vehicle_type: driver.vehicle_type || 'MOTORCYCLE',
       license_plate: driver.license_plate || '',
-      status: driver.status || 'AVAILABLE',
+      status: driver.status || 'IDLE',
       is_available: driver.is_available !== false
     });
     setSaveMsg(null);
@@ -185,11 +185,11 @@ export const AdminDriversPage = () => {
                       <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
                         driver.status === 'ON_DELIVERY'
                           ? 'bg-indigo-50 text-indigo-700 border-indigo-200'
-                          : driver.is_available
+                          : (driver.status === 'IDLE' || driver.status === 'AVAILABLE' || driver.is_available)
                           ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
                           : 'bg-slate-100 text-slate-600 border-slate-200'
                       }`}>
-                        {driver.status === 'ON_DELIVERY' ? 'En ruta' : driver.is_available ? 'Disponible' : 'Inactivo'}
+                        {driver.status === 'ON_DELIVERY' ? 'En ruta' : (driver.status === 'IDLE' || driver.status === 'AVAILABLE' || driver.is_available) ? 'Disponible' : 'Inactivo'}
                       </span>
                     </div>
 
@@ -202,7 +202,7 @@ export const AdminDriversPage = () => {
                       </span>
                       <span>•</span>
                       <span className="text-slate-700 font-semibold uppercase tracking-wider text-[11px]">
-                        {driver.vehicle_type} ({driver.license_plate || 'Sin placa'})
+                        {driver.vehicle_type === 'MOTORCYCLE' ? 'Motocicleta' : driver.vehicle_type === 'VAN' ? 'Furgoneta' : driver.vehicle_type === 'TRUCK' ? 'Camión' : driver.vehicle_type === 'BICYCLE' ? 'Bicicleta' : driver.vehicle_type} ({driver.license_plate || 'Sin placa'})
                       </span>
                     </div>
                   </div>
@@ -377,10 +377,10 @@ export const AdminDriversPage = () => {
                     onChange={(e) => setFormData({ ...formData, vehicle_type: e.target.value })}
                     className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
                   >
-                    <option value="MOTO">Motocicleta</option>
+                    <option value="MOTORCYCLE">Motocicleta</option>
                     <option value="VAN">Furgoneta / Van</option>
                     <option value="TRUCK">Camión de Carga</option>
-                    <option value="BIKE">Bicicleta Express</option>
+                    <option value="BICYCLE">Bicicleta Express</option>
                   </select>
                 </div>
 
@@ -404,9 +404,9 @@ export const AdminDriversPage = () => {
                     onChange={(e) => setFormData({ ...formData, status: e.target.value })}
                     className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
                   >
-                    <option value="AVAILABLE">Disponible</option>
+                    <option value="IDLE">Disponible / Espera</option>
                     <option value="ON_DELIVERY">En Entrega / En Ruta</option>
-                    <option value="OFF_DUTY">Fuera de Turno</option>
+                    <option value="OFFLINE">Fuera de Turno</option>
                   </select>
                 </div>
 

@@ -261,10 +261,31 @@ export const LiveFleetMap = ({
                   </strong>
                   <p className="text-xs text-slate-600 mt-0.5">{order.delivery_address}</p>
 
+                  {/* Detalle de Productos en el Pedido */}
+                  {Array.isArray(order.order_items) && order.order_items.length > 0 && (
+                    <div className="mt-2 pt-1.5 border-t border-slate-100 text-[11px] text-slate-600">
+                      <span className="font-semibold text-slate-700 block text-[10px] uppercase tracking-wider">Productos:</span>
+                      <div className="space-y-0.5 mt-0.5 max-h-20 overflow-y-auto">
+                        {order.order_items.map((item, i) => (
+                          <div key={i} className="flex justify-between items-center text-[10px]">
+                            <span className="text-slate-800 font-medium truncate max-w-[150px]">{item.quantity || 1}x {item.name || item.id}</span>
+                            {item.price && <span className="font-mono text-slate-500">${((item.price || 0) * (item.quantity || 1)).toFixed(2)}</span>}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
                   <div className="mt-2 text-[11px] text-slate-500 pt-1.5 border-t border-slate-100 flex items-center justify-between">
                     <span>Prioridad:</span>
                     <span className="font-medium text-slate-700">{order.priority}</span>
                   </div>
+                  {order.driver_name && (
+                    <div className="text-[10px] text-slate-500 flex items-center justify-between mt-0.5">
+                      <span>Chofer:</span>
+                      <span className="font-semibold text-blue-700">{order.driver_name}</span>
+                    </div>
+                  )}
                 </div>
               </Popup>
             </Marker>
