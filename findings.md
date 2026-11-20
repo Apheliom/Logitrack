@@ -115,3 +115,14 @@ logitrack/
   * Creación de `client/public/favicon.svg` y `favicon.png` utilizando el isotipo oficial del pin vectorial de LogiTrack.
   * Generación de `client/public/og-image.png` (1200x630 px) con Pillow, integrando el logotipo, gradiente tecnológico y tipografía de identidad.
   * Configuración completa de metaetiquetas en `client/index.html` (`description`, `og:title`, `og:description`, `og:image`, `twitter:card`).
+
+---
+
+## 9. Actualización Técnica de Seguridad y Auditoría Forense (Sesión Actual)
+* **Corrección de Polilíneas Fantasma en LiveFleetMap:** Se vinculó el renderizado de la ruta a la existencia de órdenes en estado `IN_TRANSIT` o `ASSIGNED`. En `AdminDashboard.jsx`, cuando el filtro activo es `PENDING` o `DELIVERED`, se pasa `activeRoute = null` explícitamente, garantizando que el mapa no trace conexiones erróneas al depósito central.
+* **Control de Turno para Conductor:** Se implementó en `DriverView.jsx` el conmutador de estado operativo (`ON_DELIVERY`, `IDLE`, `OFFLINE`) conectado a `PATCH /api/drivers/:id/status`, permitiendo a los choferes indicar si están en ruta, disponibles o fuera de servicio.
+* **Validación de Entrega y Alerta Pericial por Firma Desconocida:**
+  * En `PublicTrackingPage.jsx`, la entrega completada se destaca con un banner superior en verde esmeralda.
+  * Formulario de validación de 3 opciones: `SELF` ("Fui yo personalmente"), `THIRD_PARTY` ("Tercero autorizado") y `NOT_RECEIVED` ("¡ALERTA! Yo NO lo recibí / Firma desconocida").
+  * Si se selecciona `NOT_RECEIVED`, el backend (`orderController.js`) actualiza `is_disputed = true`, congela la telemetría actual del repartidor (`dispute_lat`, `dispute_lng`), inserta una entrada de auditoría forense en `order_status_logs` y emite el evento socket `alert:delivery_dispute` en tiempo real a administradores y al terminal del conductor.
+* **Superposición de Modales (Portal React):** El modal de edición de datos de conductores en `AdminDriversPage.jsx` fue reestructurado utilizando `createPortal(..., document.body)` con índice `z-[9999]`, eliminando el problema de corte visual y garantizando que el fondo oscuro cubra completamente la barra de navegación superior.

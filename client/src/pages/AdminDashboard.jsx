@@ -8,7 +8,8 @@ import { Badge } from '../components/UI/Badge';
 import { MetricCard } from '../components/UI/MetricCard';
 import {
   Package, Truck, CheckCircle2, Clock, Play, Square,
-  Plus, RefreshCw, ArrowUpRight, ArrowRight, Search, Filter, ShoppingBag
+  Plus, RefreshCw, ArrowUpRight, ArrowRight, Search, Filter, ShoppingBag,
+  AlertTriangle, ShieldAlert
 } from 'lucide-react';
 
 export const AdminDashboard = () => {
@@ -21,6 +22,7 @@ export const AdminDashboard = () => {
   const [filterStatus, setFilterStatus] = useState('ALL');
   const [mapFilterDriver, setMapFilterDriver] = useState('ALL');
   const [mapSearch, setMapSearch] = useState('');
+  const [disputeAlerts, setDisputeAlerts] = useState([]);
   const { socket } = useSocket();
 
   const loadAll = async () => {
@@ -46,8 +48,18 @@ export const AdminDashboard = () => {
       socket.on('order:created',  o => setOrders(p => [o, ...p]));
       socket.on('order:updated',  o => setOrders(p => p.map(x => x.id === o.id ? { ...x, ...o } : x)));
       socket.on('route:generated', ({ route }) => setActiveRoute(route));
+      socket.on('alert:delivery_dispute', (alertData) => {
+        setDisputeAlerts(prev => [alertData, ...prev]);
+      });
     }
-    return () => { if (socket) { socket.off('order:created'); socket.off('order:updated'); socket.off('route:generated'); } };
+    return () => {
+      if (socket) {
+        socket.off('order:created');
+        socket.off('order:updated');
+        socket.off('route:generated');
+        socket.off('alert:delivery_dispute');
+      }
+    };
   }, [socket]);
 
   const toggleSim = async () => {
@@ -98,6 +110,49 @@ export const AdminDashboard = () => {
 
   return (
     <div className="max-w-screen-xl mx-auto px-5 py-6 space-y-6">
+
+      {/* Alertas Críticas de Entrega Disputada / Falsificación de Firma */}
+      {disputeAlerts.map((alt, idx) => (
+        <div key={idx} className="bg-rose-50 border-2 border-rose-400 p-4 sm:p-5 rounded-3xl flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-sm animate-pulse">
+          <div className="flex items-start gap-3">
+            <div className="p-2.5 bg-rose-600 text-white rounded-2xl shrink-0">
+              <ShieldAlert className="w-6 h-6" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold text-rose-800 uppercase tracking-wider">¡Alerta Crítica: Entrega Disputada por Cliente!</span>
+                <span className="text-[10px] font-mono font-bold bg-rose-200 text-rose-900 px-2.5 py-0.5 rounded-full">{alt.tracking_number}</span>
+              </div>
+              <p className="text-xs text-rose-900 mt-1 font-medium leading-relaxed">
+                El cliente <strong className="font-bold">{alt.client_name}</strong> ({alt.client_phone}) declara formalmente <strong>NO HABER RECIBIDO</strong> el pedido y no reconocer la firma registrada.
+              </p>
+              <div className="text-[11px] text-rose-700 font-medium mt-1 flex flex-wrap gap-x-3">
+                <span>Chofer Asignado: <strong>{alt.driver_name}</strong> ({alt.driver_phone || 'Sin teléfono'})</span>
+                <span>•</span>
+                <span>Coordenadas GPS Congeladas: <strong>{alt.driver_lat?.toFixed(4)}, {alt.driver_lng?.toFixed(4)}</strong></span>
+              </div>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 self-end md:self-center shrink-0">
+            {alt.driver_lat && alt.driver_lng && (
+              <button
+                onClick={() => {
+                  setMapSearch(alt.tracking_number);
+                }}
+                className="px-3.5 py-2 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-xl transition shadow-xs"
+              >
+                Rastrear en Mapa
+              </button>
+            )}
+            <button
+              onClick={() => setDisputeAlerts(prev => prev.filter((_, i) => i !== idx))}
+              className="px-3.5 py-2 bg-white border border-rose-200 hover:bg-rose-100 text-rose-800 text-xs font-semibold rounded-xl transition"
+            >
+              Atendido
+            </button>
+          </div>
+        </div>
+      ))}
 
       {/* Page header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -191,7 +246,7 @@ export const AdminDashboard = () => {
           <LiveFleetMap
             orders={mapFilteredOrders}
             drivers={mapFilteredDrivers}
-            activeRoute={activeRoute}
+            activeRoute={filterStatus === 'PENDING' || filterStatus === 'DELIVERED' ? null : activeRoute}
             center={[10.0305, -69.2635]}
             zoom={13}
           />

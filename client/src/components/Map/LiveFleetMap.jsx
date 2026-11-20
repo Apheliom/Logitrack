@@ -125,8 +125,14 @@ export const LiveFleetMap = ({
   const { driverLocations } = useSocket();
   const depotCoords = [10.0305, -69.2635];
 
-  // Extraer coordenadas de la polilínea (con fallback automático sobre paradas si aún no hay ruta en BD)
+  // Extraer coordenadas de la polilínea (únicamente para órdenes activas en despacho o en tránsito)
   const routePolyline = useMemo(() => {
+    // Si no hay órdenes en tránsito o asignadas en la vista actual, NO dibujar ruta
+    const hasActiveDeliveries = orders.some(o => o.status === 'IN_TRANSIT' || o.status === 'ASSIGNED');
+    if (!hasActiveDeliveries) {
+      return null;
+    }
+
     if (activeRoute?.route_geojson) {
       try {
         const geo = typeof activeRoute.route_geojson === 'string'
@@ -139,14 +145,13 @@ export const LiveFleetMap = ({
       }
     }
 
-    // Fallback visible si hay órdenes cargadas: trazar circuito desde depósito
-    if (orders.length > 0) {
-      const stops = orders
-        .filter(o => o.dest_lat && o.dest_lng)
-        .map(o => [Number(o.dest_lat), Number(o.dest_lng)]);
-      if (stops.length > 0) {
-        return [depotCoords, ...stops];
-      }
+    // Trazar únicamente paradas que estén realmente en tránsito o asignadas
+    const inTransitStops = orders
+      .filter(o => (o.status === 'IN_TRANSIT' || o.status === 'ASSIGNED') && o.dest_lat && o.dest_lng)
+      .map(o => [Number(o.dest_lat), Number(o.dest_lng)]);
+
+    if (inTransitStops.length > 0) {
+      return [depotCoords, ...inTransitStops];
     }
 
     return null;

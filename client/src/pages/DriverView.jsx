@@ -20,7 +20,10 @@ import {
   Inbox,
   Play,
   Square,
-  Warehouse
+  Warehouse,
+  AlertTriangle,
+  ShieldAlert,
+  Power
 } from 'lucide-react';
 
 // Almacén Central de Despacho — Cabudare Centro, Estado Lara
@@ -88,10 +91,14 @@ export const DriverView = () => {
   const [gpsActive, setGpsActive] = useState(true);
   const [selectedOrderForSignature, setSelectedOrderForSignature] = useState(null);
   const [statusMessage, setStatusMessage] = useState('GPS permanente activo: emitiendo señal en tiempo real.');
+  const [operationalStatus, setOperationalStatus] = useState(user?.status || 'ON_DELIVERY');
+  const [updatingStatus, setUpdatingStatus] = useState(false);
+  const [disputeWarning, setDisputeWarning] = useState(null);
   const [simRunning, setSimRunning] = useState(false);
   const [simPosition, setSimPosition] = useState(null); // { lat, lng }
   const simTimerRef = useRef(null);
   const simStepRef = useRef(0);
+  const { socket } = useSocket();
 
   const driverId = user?.driver_id || 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
 
@@ -314,11 +321,71 @@ export const DriverView = () => {
     }
   };
 
+  // Cambio de estado operativo por el chofer (En servicio, Disponible, No operativo)
+  const handleStatusChange = async (newStatus) => {
+    try {
+      setUpdatingStatus(true);
+      const res = await api.patch(`/drivers/${driverId}/status`, {
+        status: newStatus,
+        is_available: newStatus !== 'OFFLINE'
+      });
+      if (res.success) {
+        setOperationalStatus(newStatus);
+        setStatusMessage(
+          newStatus === 'ON_DELIVERY'
+            ? 'Estado: En Servicio / En Ruta. Transmitiendo GPS a clientes y central.'
+            : newStatus === 'IDLE'
+            ? 'Estado: Disponible en Almacén. Listo para recibir nuevas órdenes.'
+            : 'Estado: Fuera de Servicio / No Operativo. Turno finalizado.'
+        );
+      }
+    } catch (err) {
+      alert('Error al actualizar estado operativo: ' + err.message);
+    } finally {
+      setUpdatingStatus(false);
+    }
+  };
+
+  // Escuchar alertas de auditoría por disputas de entrega
+  useEffect(() => {
+    if (socket) {
+      socket.on('alert:delivery_dispute', (alertData) => {
+        if (alertData.driver_id === driverId) {
+          setDisputeWarning(alertData);
+        }
+      });
+    }
+    return () => {
+      if (socket) socket.off('alert:delivery_dispute');
+    };
+  }, [socket, driverId]);
+
   return (
     <div className="max-w-2xl mx-auto px-4 py-8 space-y-6">
 
+      {/* Alerta de Auditoría Forense por Disputa de Entrega */}
+      {disputeWarning && (
+        <div className="bg-rose-50 border-2 border-rose-300 rounded-3xl p-5 shadow-sm text-rose-900 space-y-2 animate-pulse">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2 font-bold text-sm text-rose-700">
+              <ShieldAlert className="w-5 h-5 text-rose-600" />
+              <span>NOTIFICACIÓN URGENTE DE AUDITORÍA FORENSE</span>
+            </div>
+            <button
+              onClick={() => setDisputeWarning(null)}
+              className="text-xs font-semibold text-rose-600 hover:text-rose-900 underline"
+            >
+              Cerrar aviso
+            </button>
+          </div>
+          <p className="text-xs leading-relaxed">
+            El cliente de la guía <strong className="font-mono">{disputeWarning.tracking_number}</strong> ({disputeWarning.client_name}) ha reportado formalmente <strong>NO haber recibido su paquete</strong> y desconoce la firma. La central de despacho ha congelado las coordenadas GPS para auditoría inmediata.
+          </p>
+        </div>
+      )}
+
       {/* Driver Header Profile Card */}
-      <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-xs">
+      <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-xs space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <div className="w-12 h-12 rounded-2xl bg-blue-50 border border-blue-200 text-blue-600 flex items-center justify-center font-bold text-lg shadow-xs">
@@ -337,13 +404,76 @@ export const DriverView = () => {
 
           <div className="flex items-center gap-2 px-3.5 py-2.5 rounded-xl text-xs font-bold bg-emerald-50 text-emerald-800 border border-emerald-200 shadow-xs">
             <Radio className="w-4 h-4 text-emerald-600 animate-pulse" />
-            <span>GPS Siempre Activo</span>
+            <span>GPS Permanente Activo</span>
+          </div>
+        </div>
+
+        {/* Selector de Estado Operativo del Conductor */}
+        <div className="pt-2 border-t border-slate-100">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+              Mi Estado de Turno
+            </span>
+            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+              operationalStatus === 'ON_DELIVERY'
+                ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                : operationalStatus === 'IDLE'
+                ? 'bg-blue-50 text-blue-700 border-blue-200'
+                : 'bg-slate-100 text-slate-600 border-slate-200'
+            }`}>
+              {operationalStatus === 'ON_DELIVERY'
+                ? 'En Ruta / En Servicio'
+                : operationalStatus === 'IDLE'
+                ? 'Disponible en Base'
+                : 'No Operativo (Fuera de Turno)'}
+            </span>
+          </div>
+
+          <div className="grid grid-cols-3 gap-2">
+            <button
+              onClick={() => handleStatusChange('ON_DELIVERY')}
+              disabled={updatingStatus}
+              className={`py-2 px-2.5 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 border ${
+                operationalStatus === 'ON_DELIVERY'
+                  ? 'bg-emerald-600 text-white border-emerald-700 shadow-xs'
+                  : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+              }`}
+            >
+              <span className={`w-2 h-2 rounded-full ${operationalStatus === 'ON_DELIVERY' ? 'bg-white' : 'bg-emerald-500'}`} />
+              <span className="truncate">En Servicio</span>
+            </button>
+
+            <button
+              onClick={() => handleStatusChange('IDLE')}
+              disabled={updatingStatus}
+              className={`py-2 px-2.5 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 border ${
+                operationalStatus === 'IDLE'
+                  ? 'bg-blue-600 text-white border-blue-700 shadow-xs'
+                  : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+              }`}
+            >
+              <span className={`w-2 h-2 rounded-full ${operationalStatus === 'IDLE' ? 'bg-white' : 'bg-blue-500'}`} />
+              <span className="truncate">Disponible</span>
+            </button>
+
+            <button
+              onClick={() => handleStatusChange('OFFLINE')}
+              disabled={updatingStatus}
+              className={`py-2 px-2.5 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 border ${
+                operationalStatus === 'OFFLINE'
+                  ? 'bg-slate-800 text-white border-slate-900 shadow-xs'
+                  : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+              }`}
+            >
+              <Power className="w-3.5 h-3.5" />
+              <span className="truncate">No Operativo</span>
+            </button>
           </div>
         </div>
 
         {statusMessage && (
-          <div className="mt-4 text-xs text-emerald-800 bg-emerald-50 border border-emerald-200 p-2.5 rounded-xl flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
+          <div className="text-xs text-slate-600 bg-slate-50 border border-slate-200 p-2.5 rounded-xl flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-blue-500 shrink-0" />
             <span>{statusMessage}</span>
           </div>
         )}

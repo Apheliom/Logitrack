@@ -56,6 +56,11 @@ CREATE TABLE IF NOT EXISTS orders (
     client_feedback_at TIMESTAMPTZ DEFAULT NULL,
     total_amount NUMERIC(10, 2) DEFAULT 0.00,
     order_items JSONB DEFAULT '[]'::jsonb,
+    is_disputed BOOLEAN DEFAULT false,
+    dispute_reason TEXT,
+    dispute_lat NUMERIC(10, 7),
+    dispute_lng NUMERIC(10, 7),
+    disputed_at TIMESTAMPTZ,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     delivered_at TIMESTAMPTZ,
     updated_at TIMESTAMPTZ DEFAULT NOW()

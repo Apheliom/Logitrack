@@ -45,6 +45,11 @@ const ensureColumns = async () => {
       ALTER TABLE orders ADD COLUMN IF NOT EXISTS client_feedback_at TIMESTAMPTZ;
       ALTER TABLE orders ADD COLUMN IF NOT EXISTS total_amount NUMERIC(10, 2) DEFAULT 0.00;
       ALTER TABLE orders ADD COLUMN IF NOT EXISTS order_items JSONB DEFAULT '[]'::jsonb;
+      ALTER TABLE orders ADD COLUMN IF NOT EXISTS is_disputed BOOLEAN DEFAULT false;
+      ALTER TABLE orders ADD COLUMN IF NOT EXISTS dispute_reason TEXT;
+      ALTER TABLE orders ADD COLUMN IF NOT EXISTS dispute_lat NUMERIC(10, 7);
+      ALTER TABLE orders ADD COLUMN IF NOT EXISTS dispute_lng NUMERIC(10, 7);
+      ALTER TABLE orders ADD COLUMN IF NOT EXISTS disputed_at TIMESTAMPTZ;
 
       -- Normalización de constraints de vehículos y estados en drivers
       DO $$

@@ -278,7 +278,7 @@ export const CustomerStorePage = () => {
                   <div className="absolute top-3 left-3 bg-white/90 backdrop-blur-xs px-2.5 py-0.5 rounded-full text-[10px] font-bold text-slate-700 border border-slate-200/80">
                     {product.category}
                   </div>
-                  
+
                   {/* Insignia calculada 100% en tiempo real desde la Base de Datos */}
                   {catalogStats?.topSellingId === product.id && Number(catalogStats?.topSellingUnits) > 0 ? (
                     <div className="absolute top-3 right-3 bg-amber-500 text-white px-2.5 py-0.5 rounded-full text-[10px] font-bold shadow-xs flex items-center gap-1">
@@ -346,7 +346,7 @@ export const CustomerStorePage = () => {
 
       {/* Checkout Modal */}
       {checkoutOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
           <div className="bg-white border border-slate-200 rounded-3xl w-full max-w-lg shadow-xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
 
             <div className="px-6 py-5 border-b border-slate-100 flex items-center justify-between">

@@ -497,7 +497,7 @@ const getAnalyticsAndAudit = async (req, res) => {
   }
 };
 
-// Confirmación de entrega por parte del cliente, calificación y comentario
+// Confirmación de entrega por parte del cliente, calificación, comentario y alerta de disputa/fraude
 const submitOrderFeedback = async (req, res) => {
   try {
     const { trackingNumber } = req.params;
@@ -511,6 +511,33 @@ const submitOrderFeedback = async (req, res) => {
       });
     }
 
+    const isDispute = (confirmed_by_client === false && relationship === 'NOT_RECEIVED') || relationship === 'NOT_RECEIVED';
+
+    // Si es disputa (el cliente afirma no haber firmado ni recibido), capturar telemetría del chofer
+    let driverGps = { lat: null, lng: null, full_name: 'Conductor', phone: null, driver_id: null };
+    const orderInfo = await db.query(
+      `SELECT o.id, o.assigned_driver_id, o.client_name, o.client_phone,
+              d.current_lat, d.current_lng, u.full_name AS driver_name, u.phone AS driver_phone
+       FROM orders o
+       LEFT JOIN drivers d ON o.assigned_driver_id = d.id
+       LEFT JOIN users u ON d.user_id = u.id
+       WHERE o.tracking_number = $1`,
+      [trackingNumber.trim()]
+    );
+
+    if (orderInfo.rows.length > 0) {
+      const row = orderInfo.rows[0];
+      driverGps = {
+        driver_id: row.assigned_driver_id,
+        lat: row.current_lat,
+        lng: row.current_lng,
+        full_name: row.driver_name || 'Conductor',
+        phone: row.driver_phone,
+        client_name: row.client_name,
+        client_phone: row.client_phone
+      };
+    }
+
     const result = await db.query(
       `UPDATE orders
        SET client_confirmed_received = $1,
@@ -518,14 +545,25 @@ const submitOrderFeedback = async (req, res) => {
            client_rating = $3,
            client_feedback = $4,
            client_feedback_at = NOW(),
+           is_disputed = $5,
+           dispute_reason = $6,
+           dispute_lat = $7,
+           dispute_lng = $8,
+           disputed_at = CASE WHEN $5 THEN NOW() ELSE NULL END,
            updated_at = NOW()
-       WHERE tracking_number = $5
-       RETURNING id, tracking_number, status, client_confirmed_received, client_recipient_relationship, client_rating, client_feedback, client_feedback_at`,
+       WHERE tracking_number = $9
+       RETURNING id, tracking_number, status, client_confirmed_received, client_recipient_relationship,
+                 client_rating, client_feedback, client_feedback_at, is_disputed, dispute_reason,
+                 dispute_lat, dispute_lng, disputed_at`,
       [
-        confirmed_by_client !== undefined ? Boolean(confirmed_by_client) : true,
+        !isDispute && confirmed_by_client !== undefined ? Boolean(confirmed_by_client) : !isDispute,
         relationship || 'SELF',
         parsedRating,
         feedback ? feedback.trim() : null,
+        isDispute,
+        isDispute ? (feedback ? feedback.trim() : 'Cliente desconoce la entrega física y declara no haber firmado.') : null,
+        isDispute ? driverGps.lat : null,
+        isDispute ? driverGps.lng : null,
         trackingNumber.trim()
       ]
     );
@@ -539,15 +577,46 @@ const submitOrderFeedback = async (req, res) => {
 
     const updatedOrder = result.rows[0];
 
+    // Registrar evento de auditoría forense si hay disputa por firma no reconocida
+    if (isDispute) {
+      await db.query(
+        `INSERT INTO order_status_logs (order_id, previous_status, new_status, notes)
+         VALUES ($1, 'DELIVERED', 'DISPUTED', $2)`,
+        [
+          updatedOrder.id,
+          `ALERTA FORENSE CRÍTICA: Cliente reporta NO haber recibido el paquete y no reconoce la firma. Coordenadas GPS del conductor registradas: (${driverGps.lat}, ${driverGps.lng}). Conductor: ${driverGps.full_name} (${driverGps.phone}).`
+        ]
+      );
+    }
+
     // Transmitir vía Socket.io para actualización instantánea
     if (req.app.get('io')) {
       req.app.get('io').to(`tracking_${updatedOrder.tracking_number}`).emit('tracking:order_update', updatedOrder);
       req.app.get('io').emit('order:feedback_submitted', updatedOrder);
+
+      // Si hay alerta de entrega desconocida/falsificación de firma, emitir a despachadores y conductor
+      if (isDispute) {
+        req.app.get('io').emit('alert:delivery_dispute', {
+          order_id: updatedOrder.id,
+          tracking_number: updatedOrder.tracking_number,
+          client_name: driverGps.client_name,
+          client_phone: driverGps.client_phone,
+          driver_id: driverGps.driver_id,
+          driver_name: driverGps.full_name,
+          driver_phone: driverGps.phone,
+          driver_lat: driverGps.lat,
+          driver_lng: driverGps.lng,
+          reason: updatedOrder.dispute_reason,
+          disputed_at: updatedOrder.disputed_at || new Date().toISOString()
+        });
+      }
     }
 
     return res.status(200).json({
       success: true,
-      message: 'Retroalimentación y confirmación registrada exitosamente.',
+      message: isDispute
+        ? 'Alerta registrada. La central de despacho ha sido notificada de inmediato.'
+        : 'Retroalimentación y confirmación registrada exitosamente.',
       order: updatedOrder
     });
   } catch (err) {
