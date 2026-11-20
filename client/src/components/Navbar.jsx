@@ -3,7 +3,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useSocket } from '../context/SocketContext';
 import { LogiTrackLogo } from './Brand/LogiTrackLogo';
-import { LogOut, Radio, Package, Navigation, LayoutDashboard, ShoppingBag, BarChart3, ClipboardList } from 'lucide-react';
+import { LogOut, Radio, Package, Navigation, LayoutDashboard, ShoppingBag, BarChart3, ClipboardList, Truck } from 'lucide-react';
 
 export const Navbar = () => {
   const { user, logout } = useAuth();

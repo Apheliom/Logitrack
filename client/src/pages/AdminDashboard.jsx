@@ -8,7 +8,7 @@ import { Badge } from '../components/UI/Badge';
 import { MetricCard } from '../components/UI/MetricCard';
 import {
   Package, Truck, CheckCircle2, Clock, Play, Square,
-  Zap, Plus, RefreshCw, ArrowUpRight, ArrowRight, ShieldCheck
+  Plus, RefreshCw, ArrowUpRight, ArrowRight
 } from 'lucide-react';
 
 export const AdminDashboard = () => {
