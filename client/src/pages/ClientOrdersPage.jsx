@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../api/client';
 import { useAuth } from '../context/AuthContext';
+import { Badge } from '../components/UI/Badge';
 import {
   Package,
   Truck,
@@ -114,21 +115,7 @@ export const ClientOrdersPage = () => {
                 </div>
 
                 <div className="flex items-center gap-2">
-                  <span
-                    className={`px-3 py-1 rounded-full text-xs font-bold border ${
-                      order.status === 'DELIVERED'
-                        ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                        : order.status === 'IN_TRANSIT'
-                        ? 'bg-indigo-50 text-indigo-700 border-indigo-200'
-                        : 'bg-amber-50 text-amber-700 border-amber-200'
-                    }`}
-                  >
-                    {order.status === 'DELIVERED'
-                      ? 'Entregado con Éxito'
-                      : order.status === 'IN_TRANSIT'
-                      ? 'En Ruta de Despacho'
-                      : 'Orden Recibida'}
-                  </span>
+                  <Badge variant={order.status} />
                 </div>
               </div>
 

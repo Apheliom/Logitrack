@@ -86,3 +86,18 @@ logitrack/
 * **Hallazgo 1 (Origen Operativo / Depósito):** El sistema utilizaba coordenadas por defecto de Bogotá (4.6534, -74.0836) en `schema.sql`, `routeController.js`, `gpsSimulator.js` y `CustomerStorePage.jsx`. Se unifica la ubicación del Almacén Central en **Cabudare Centro (Lara, Venezuela)** en lat: `10.0305`, lng: `-69.2635`.
 * **Hallazgo 2 (Visualización de Ruta en Driver):** `DriverView.jsx` carecía de visualización cartográfica directa para el conductor. Se planifica integrar un mapa interactivo que muestre el almacén central de origen en Cabudare Centro, la posición del repartidor, las paradas asignadas y la polilínea del trayecto.
 * **Hallazgo 3 (Simulador Interactivo de Recorrido para Defensa):** Se incorporará un control de "Simulación de Recorrido" directamente en el terminal del repartidor (`DriverView.jsx`) que interpole progresivamente pasos hacia los destinos asignados y emita los eventos GPS por WebSocket, permitiendo verificar el movimiento sincronizado en tiempo real en la vista de Repartidor, Cliente y Administrador.
+
+
+## 8. Arquitectura y Colorimetría del Frontend (Basado en .agent-skills)
+* **Colorimetría Logística Profesional (Design Tokens):**
+  * Fondo y Canvas: `slate-100/80` (`#f1f5f9`), tarjetas en `bg-white` con bordes nítidos `border-slate-200/80` y sombras rasantes `shadow-xs` para evitar monotonía blanca y definir separaciones claras.
+  * Primario y Enfoque: Azul Logístico Profundo / Tech Indigo (`#1d4ed8` - `#2563eb`).
+  * Telemetría y Estados Semánticos: Esmeralda (`#059669`) para entregas y GPS vivo, Azul Cobalto (`#0284c7`) para tránsito, Ámbar (`#d97706`) para pedidos pendientes, y Carmesí (`#dc2626`) para prioridad urgente. Cero emojis; iconos vectoriales Lucide y SVGs geométricos exclusivamente.
+* **Patrones de Composición (`composition-patterns`):**
+  * Componentes compuestos para órdenes y tarjetas operativas (`Card`, `Card.Header`, `Card.Content`, `Card.Footer`).
+  * Variantes explícitas tipadas (`StatusBadge variant="IN_TRANSIT"`) eliminando props booleanas redundantes.
+  * Aislamiento del estado de telemetría en sub-árboles de mapa para evitar re-renderizados innecesarios del dashboard y de la barra de navegación.
+* **Optimización de Rendimiento (`react-best-practices`):**
+  * Lecturas concurrentes con `Promise.all` para eliminar cascadas (waterfalls).
+  * Renderizado condicional mediante ternarios estrictos (`condition ? <A /> : null`).
+  * Micro-skeletons con `aria-busy` durante estados de carga para eliminar saltos de maquetación (CLS).

@@ -3,49 +3,12 @@ import { api } from '../api/client';
 import { useSocket } from '../context/SocketContext';
 import { LiveFleetMap } from '../components/Map/LiveFleetMap';
 import { CreateOrderModal } from '../components/Orders/CreateOrderModal';
+import { Badge } from '../components/UI/Badge';
+import { MetricCard } from '../components/UI/MetricCard';
 import {
   Package, Truck, CheckCircle2, Clock, Play, Square,
   Zap, Plus, RefreshCw, ArrowUpRight
 } from 'lucide-react';
-
-// --- Sub-components ---
-
-const StatCard = ({ label, value, icon: Icon, color = 'text-slate-900', bgColor = 'bg-slate-50' }) => (
-  <div className="bg-white border border-slate-200/90 rounded-2xl p-5 shadow-xs hover:border-slate-300 transition-colors">
-    <div className="flex items-center justify-between mb-3">
-      <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">{label}</span>
-      <div className={`p-2 rounded-xl ${bgColor} border border-slate-100`}>
-        <Icon className={`w-4 h-4 ${color}`} strokeWidth={2} />
-      </div>
-    </div>
-    <div className={`text-2xl font-bold tabular-nums tracking-tight ${color}`}>{value}</div>
-  </div>
-);
-
-const StatusBadge = ({ status }) => {
-  const map = {
-    PENDING:    { label: 'Pendiente',    className: 'bg-amber-50 text-amber-800 border-amber-300/80' },
-    ASSIGNED:   { label: 'Asignado',     className: 'bg-sky-50 text-sky-800 border-sky-300/80' },
-    IN_TRANSIT: { label: 'En tránsito',  className: 'bg-indigo-50 text-indigo-800 border-indigo-300/80' },
-    DELIVERED:  { label: 'Entregado',    className: 'bg-emerald-50 text-emerald-800 border-emerald-300/80' },
-    FAILED:     { label: 'Fallido',      className: 'bg-rose-50 text-rose-800 border-rose-300/80' },
-  };
-  const cfg = map[status] || { label: status, className: 'bg-slate-100 text-slate-700 border-slate-300' };
-  return (
-    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold border ${cfg.className}`}>
-      {cfg.label}
-    </span>
-  );
-};
-
-const PriorityBadge = ({ priority }) => {
-  if (priority === 'URGENT') return (
-    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-red-50 text-red-700 border border-red-200">Urgente</span>
-  );
-  return (
-    <span className="text-[11px] text-ink-disabled font-medium">{priority === 'LOW' ? 'Baja' : 'Normal'}</span>
-  );
-};
 
 export const AdminDashboard = () => {
   const [orders,  setOrders]  = useState([]);
@@ -139,10 +102,10 @@ export const AdminDashboard = () => {
 
       {/* Stat cards */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        <StatCard label="Total órdenes"  value={metrics.total}     icon={Package}     color="text-slate-900" bgColor="bg-slate-100" />
-        <StatCard label="Pendientes"     value={metrics.pending}   icon={Clock}       color="text-amber-700" bgColor="bg-amber-50" />
-        <StatCard label="En tránsito"    value={metrics.transit}   icon={Truck}       color="text-indigo-700" bgColor="bg-indigo-50" />
-        <StatCard label="Entregadas"     value={metrics.delivered} icon={CheckCircle2} color="text-emerald-700" bgColor="bg-emerald-50" />
+        <MetricCard title="Total Órdenes" value={metrics.total} icon={Package} variant="default" subtitle="En base de datos" />
+        <MetricCard title="Pendientes" value={metrics.pending} icon={Clock} variant="amber" subtitle="En cola de despacho" />
+        <MetricCard title="En Tránsito" value={metrics.transit} icon={Truck} variant="sky" subtitle="Repartidores en ruta" />
+        <MetricCard title="Entregadas" value={metrics.delivered} icon={CheckCircle2} variant="emerald" subtitle="Confirmadas con firma" />
       </div>
 
       {/* Map + Route optimizer */}
@@ -159,7 +122,7 @@ export const AdminDashboard = () => {
               {drivers.length} Vehículos en radar
             </span>
           </div>
-          <LiveFleetMap orders={orders} drivers={drivers} activeRoute={activeRoute} center={[4.6534, -74.0836]} zoom={13} />
+          <LiveFleetMap orders={orders} drivers={drivers} activeRoute={activeRoute} center={[10.0305, -69.2635]} zoom={13} />
         </div>
 
         {/* Right column */}
@@ -276,9 +239,9 @@ export const AdminDashboard = () => {
                   <td className="px-6 py-4 font-mono text-xs font-bold text-blue-600">{o.tracking_number}</td>
                   <td className="px-6 py-4 font-medium text-slate-900">{o.client_name}</td>
                   <td className="px-6 py-4 text-slate-500 text-xs hidden md:table-cell max-w-[220px] truncate">{o.delivery_address}</td>
-                  <td className="px-6 py-4"><PriorityBadge priority={o.priority} /></td>
+                  <td className="px-6 py-4"><Badge variant={o.priority} /></td>
                   <td className="px-6 py-4 text-xs font-medium text-slate-700 hidden sm:table-cell">{o.driver_name || <span className="text-slate-400 italic">Sin asignar</span>}</td>
-                  <td className="px-6 py-4"><StatusBadge status={o.status} /></td>
+                  <td className="px-6 py-4"><Badge variant={o.status} /></td>
                   <td className="px-6 py-4 text-right">
                     <a href={`/track/${o.tracking_number}`} target="_blank" rel="noreferrer"
                       className="inline-flex items-center gap-1 text-xs font-semibold text-blue-600 hover:text-blue-700 hover:underline"

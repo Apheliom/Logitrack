@@ -119,11 +119,11 @@ export const LiveFleetMap = ({
   orders = [],
   drivers = [],
   activeRoute = null,
-  center = [4.6534, -74.0836],
+  center = [10.0305, -69.2635],
   zoom = 13
 }) => {
   const { driverLocations } = useSocket();
-  const depotCoords = [4.6534, -74.0836];
+  const depotCoords = [10.0305, -69.2635];
 
   // Extraer coordenadas de la polilínea (con fallback automático sobre paradas si aún no hay ruta en BD)
   const routePolyline = useMemo(() => {
@@ -186,14 +186,14 @@ export const LiveFleetMap = ({
         <Marker position={depotCoords} icon={createDepotMarker()}>
           <Popup>
             <div className="p-1">
-              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">
+              <span className="text-[10px] font-bold text-blue-600 uppercase tracking-wider block">
                 Base Operativa
               </span>
               <strong className="text-slate-900 text-sm font-semibold block mt-0.5">
-                Depósito Logístico Central
+                Almacén Central — Cabudare Centro
               </strong>
               <p className="text-xs text-slate-600 mt-1">
-                Punto de carga, empaque y distribución de flota.
+                Punto central de carga, empaque y despacho de flota.
               </p>
             </div>
           </Popup>

@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../api/client';
+import { MetricCard } from '../components/UI/MetricCard';
+import { Badge } from '../components/UI/Badge';
 import {
   BarChart3,
   TrendingUp,
@@ -78,65 +80,35 @@ export const AdminAnalyticsPage = () => {
 
       {/* KPI Cards Grid */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        <div className="bg-white border border-slate-200 rounded-3xl p-5 shadow-xs">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Ingresos Tienda</span>
-            <div className="p-2 bg-emerald-50 text-emerald-600 rounded-xl">
-              <DollarSign className="w-4 h-4" />
-            </div>
-          </div>
-          <div className="text-2xl font-bold text-slate-900 tabular-nums">
-            ${metrics.totalRevenue.toFixed(2)}
-          </div>
-          <span className="text-[10px] text-emerald-700 font-semibold mt-1 block">
-            +18.4% vs semana previa
-          </span>
-        </div>
-
-        <div className="bg-white border border-slate-200 rounded-3xl p-5 shadow-xs">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Tasa a Tiempo</span>
-            <div className="p-2 bg-blue-50 text-blue-600 rounded-xl">
-              <CheckCircle2 className="w-4 h-4" />
-            </div>
-          </div>
-          <div className="text-2xl font-bold text-blue-600 tabular-nums">
-            {metrics.onTimeRatePercentage}%
-          </div>
-          <span className="text-[10px] text-slate-500 font-medium mt-1 block">
-            SLA de entrega cumplido
-          </span>
-        </div>
-
-        <div className="bg-white border border-slate-200 rounded-3xl p-5 shadow-xs">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Tiempo Medio</span>
-            <div className="p-2 bg-indigo-50 text-indigo-600 rounded-xl">
-              <Clock className="w-4 h-4" />
-            </div>
-          </div>
-          <div className="text-2xl font-bold text-slate-900 tabular-nums">
-            {metrics.avgDeliveryTimeMinutes}m
-          </div>
-          <span className="text-[10px] text-slate-500 font-medium mt-1 block">
-            Despacho a recepción
-          </span>
-        </div>
-
-        <div className="bg-white border border-slate-200 rounded-3xl p-5 shadow-xs">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Total Paquetes</span>
-            <div className="p-2 bg-purple-50 text-purple-600 rounded-xl">
-              <Package className="w-4 h-4" />
-            </div>
-          </div>
-          <div className="text-2xl font-bold text-slate-900 tabular-nums">
-            {metrics.totalOrders}
-          </div>
-          <span className="text-[10px] text-purple-700 font-semibold mt-1 block">
-            {metrics.deliveredCount} Entregados exitosos
-          </span>
-        </div>
+        <MetricCard
+          title="Ingresos Tienda"
+          value={`$${metrics.totalRevenue.toFixed(2)}`}
+          icon={DollarSign}
+          variant="emerald"
+          trend="+18.4%"
+          subtitle="Volumen de ventas directas"
+        />
+        <MetricCard
+          title="Tasa a Tiempo"
+          value={`${metrics.onTimeRatePercentage}%`}
+          icon={CheckCircle2}
+          variant="default"
+          subtitle="SLA de entrega cumplido"
+        />
+        <MetricCard
+          title="Tiempo Medio"
+          value={`${metrics.avgDeliveryTimeMinutes}m`}
+          icon={Clock}
+          variant="sky"
+          subtitle="Despacho a recepción"
+        />
+        <MetricCard
+          title="Total Paquetes"
+          value={metrics.totalOrders}
+          icon={Package}
+          variant="amber"
+          subtitle={`${metrics.deliveredCount} Entregas completadas`}
+        />
       </div>
 
       {/* Top Products Ranking */}
