@@ -15,7 +15,7 @@ export const LoginPage = () => {
   const doLogin = async (e, demoEmail, demoPass) => {
     if (e) e.preventDefault();
     const resolvedEmail = demoEmail || email;
-    const resolvedPass  = demoPass  || password;
+    const resolvedPass = demoPass || password;
     setError('');
     setLoading(true);
     try {

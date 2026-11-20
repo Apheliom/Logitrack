@@ -43,6 +43,8 @@ const ensureColumns = async () => {
       ALTER TABLE orders ADD COLUMN IF NOT EXISTS client_rating INT;
       ALTER TABLE orders ADD COLUMN IF NOT EXISTS client_feedback TEXT;
       ALTER TABLE orders ADD COLUMN IF NOT EXISTS client_feedback_at TIMESTAMPTZ;
+      ALTER TABLE orders ADD COLUMN IF NOT EXISTS total_amount NUMERIC(10, 2) DEFAULT 0.00;
+      ALTER TABLE orders ADD COLUMN IF NOT EXISTS order_items JSONB DEFAULT '[]'::jsonb;
     `);
     console.log('[DB] Esquema verificado: columnas de retroalimentación de entrega activas.');
   } catch (e) {

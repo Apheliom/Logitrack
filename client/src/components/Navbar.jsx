@@ -46,6 +46,7 @@ export const Navbar = () => {
           {user.role === 'ADMIN' && (
             <>
               <NavLink to="/admin" icon={LayoutDashboard} label="Panel & Mapa" />
+              <NavLink to="/admin/drivers" icon={Truck} label="Conductores" />
               <NavLink to="/admin/analytics" icon={BarChart3} label="Estadísticas & Bitácora" />
             </>
           )}

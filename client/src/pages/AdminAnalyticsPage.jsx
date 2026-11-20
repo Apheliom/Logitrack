@@ -44,9 +44,9 @@ export const AdminAnalyticsPage = () => {
     deliveredCount: 0,
     transitCount: 0,
     pendingCount: 0,
-    totalRevenue: 2730.50,
-    avgDeliveryTimeMinutes: 26.4,
-    onTimeRatePercentage: 94.2
+    totalRevenue: 0.0,
+    avgDeliveryTimeMinutes: 0.0,
+    onTimeRatePercentage: 0.0
   };
 
   const topProducts = data?.topProducts || [];
@@ -138,23 +138,31 @@ export const AdminAnalyticsPage = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {topProducts.map((p, idx) => (
-                <tr key={idx} className="hover:bg-slate-50/70 transition-colors">
-                  <td className="px-5 py-4 font-bold text-slate-400">0{idx + 1}</td>
-                  <td className="px-5 py-4 font-bold text-slate-900 text-sm">{p.name}</td>
-                  <td className="px-5 py-4">
-                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-200">
-                      {p.category}
-                    </span>
-                  </td>
-                  <td className="px-5 py-4 font-mono font-bold text-slate-800 text-sm">
-                    {p.units} uds.
-                  </td>
-                  <td className="px-5 py-4 text-right font-mono font-bold text-emerald-600 text-sm">
-                    ${p.revenue.toFixed(2)} USD
+              {topProducts.length === 0 ? (
+                <tr>
+                  <td colSpan={5} className="px-6 py-10 text-center text-slate-400">
+                    No se registran ventas ni productos despachados aún en la base de datos.
                   </td>
                 </tr>
-              ))}
+              ) : (
+                topProducts.map((p, idx) => (
+                  <tr key={idx} className="hover:bg-slate-50/70 transition-colors">
+                    <td className="px-5 py-4 font-bold text-slate-400">0{idx + 1}</td>
+                    <td className="px-5 py-4 font-bold text-slate-900 text-sm">{p.name}</td>
+                    <td className="px-5 py-4">
+                      <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-200">
+                        {p.category}
+                      </span>
+                    </td>
+                    <td className="px-5 py-4 font-mono font-bold text-slate-800 text-sm">
+                      {p.units} uds.
+                    </td>
+                    <td className="px-5 py-4 text-right font-mono font-bold text-emerald-600 text-sm">
+                      ${p.revenue.toFixed(2)} USD
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>

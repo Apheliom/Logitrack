@@ -7,6 +7,7 @@ import { LoginPage } from './pages/LoginPage';
 import { RegisterPage } from './pages/RegisterPage';
 import { AdminDashboard } from './pages/AdminDashboard';
 import { AdminAnalyticsPage } from './pages/AdminAnalyticsPage';
+import { AdminDriversPage } from './pages/AdminDriversPage';
 import { DriverView } from './pages/DriverView';
 import { CustomerStorePage } from './pages/CustomerStorePage';
 import { ClientOrdersPage } from './pages/ClientOrdersPage';
@@ -88,6 +89,14 @@ export function App() {
                   element={
                     <ProtectedRoute allowedRoles={['ADMIN']}>
                       <AdminAnalyticsPage />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/admin/drivers"
+                  element={
+                    <ProtectedRoute allowedRoles={['ADMIN']}>
+                      <AdminDriversPage />
                     </ProtectedRoute>
                   }
                 />

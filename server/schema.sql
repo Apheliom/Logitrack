@@ -53,6 +53,8 @@ CREATE TABLE IF NOT EXISTS orders (
     client_rating INT DEFAULT NULL, -- Puntuación del cliente (1 a 5)
     client_feedback TEXT DEFAULT NULL, -- Comentario u observación opcional del cliente
     client_feedback_at TIMESTAMPTZ DEFAULT NULL,
+    total_amount NUMERIC(10, 2) DEFAULT 0.00,
+    order_items JSONB DEFAULT '[]'::jsonb,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     delivered_at TIMESTAMPTZ,
     updated_at TIMESTAMPTZ DEFAULT NOW()
@@ -90,28 +92,20 @@ CREATE INDEX IF NOT EXISTS idx_orders_driver ON orders(assigned_driver_id);
 CREATE INDEX IF NOT EXISTS idx_drivers_status ON drivers(status, is_available);
 CREATE INDEX IF NOT EXISTS idx_order_logs_order ON order_status_logs(order_id);
 
--- 8. Datos Semilla (Seed Data) para Demostración Inmediata
--- Contraseña para todos los usuarios semilla: Password123!
+-- 8. Cuentas de Acceso al Sistema (Credenciales de Entrada)
+-- Contraseña para todas las cuentas iniciales: Password123!
 INSERT INTO users (id, email, password_hash, full_name, role, phone)
 VALUES 
-    ('11111111-1111-1111-1111-111111111111', 'admin@logitrack.com', '$2a$10$UUWM1YtjlFrdaGtbWLEH6.Unls3TePupkui3PX4KGLmgIRWTnSvci', 'Administrador General', 'ADMIN', '+1234567890'),
-    ('22222222-2222-2222-2222-222222222222', 'driver1@logitrack.com', '$2a$10$UUWM1YtjlFrdaGtbWLEH6.Unls3TePupkui3PX4KGLmgIRWTnSvci', 'Carlos Mendoza (Moto 01)', 'DRIVER', '+1234567891'),
-    ('33333333-3333-3333-3333-333333333333', 'driver2@logitrack.com', '$2a$10$UUWM1YtjlFrdaGtbWLEH6.Unls3TePupkui3PX4KGLmgIRWTnSvci', 'Laura Gomez (Van 02)', 'DRIVER', '+1234567892'),
-    ('44444444-4444-4444-4444-444444444444', 'cliente@logitrack.com', '$2a$10$UUWM1YtjlFrdaGtbWLEH6.Unls3TePupkui3PX4KGLmgIRWTnSvci', 'Supermercado Central', 'CLIENT', '+1234567893')
+    ('11111111-1111-1111-1111-111111111111', 'admin@logitrack.com', '$2a$10$UUWM1YtjlFrdaGtbWLEH6.Unls3TePupkui3PX4KGLmgIRWTnSvci', 'Administrador General', 'ADMIN', '+58 412 1111111'),
+    ('22222222-2222-2222-2222-222222222222', 'driver1@logitrack.com', '$2a$10$UUWM1YtjlFrdaGtbWLEH6.Unls3TePupkui3PX4KGLmgIRWTnSvci', 'Carlos Mendoza (Moto 01)', 'DRIVER', '+58 414 2222222'),
+    ('44444444-4444-4444-4444-444444444444', 'cliente@logitrack.com', '$2a$10$UUWM1YtjlFrdaGtbWLEH6.Unls3TePupkui3PX4KGLmgIRWTnSvci', 'Cliente Demostración', 'CLIENT', '+58 416 3333333')
 ON CONFLICT (email) DO UPDATE SET password_hash = EXCLUDED.password_hash;
 
--- Repartidores semilla (Almacén Central: Cabudare Centro, Estado Lara: 10.0305, -69.2635)
+-- Repartidor Inicial (Almacén Central: Cabudare Centro, Estado Lara: 10.0305, -69.2635)
 INSERT INTO drivers (id, user_id, vehicle_type, license_plate, current_lat, current_lng, is_available, status)
 VALUES
-    ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', '22222222-2222-2222-2222-222222222222', 'MOTORCYCLE', 'ABC-123', 10.0305, -69.2635, true, 'IDLE'),
-    ('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', '33333333-3333-3333-3333-333333333333', 'VAN', 'XYZ-789', 10.0320, -69.2610, true, 'IDLE')
+    ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', '22222222-2222-2222-2222-222222222222', 'MOTORCYCLE', 'ABC-123', 10.0305, -69.2635, true, 'IDLE')
 ON CONFLICT (user_id) DO UPDATE SET current_lat = EXCLUDED.current_lat, current_lng = EXCLUDED.current_lng;
 
--- Órdenes semilla (Cabudare y Barquisimeto, Estado Lara)
-INSERT INTO orders (id, tracking_number, client_name, client_phone, delivery_address, dest_lat, dest_lng, priority, status)
-VALUES
-    ('10000000-0000-0000-0000-000000000001', 'TRK-2026-001', 'Farmacia San Rafael', '+58 412 1234567', 'Av. La Mata c/ Calle 9, Cabudare', 10.0350, -69.2680, 'URGENT', 'PENDING'),
-    ('10000000-0000-0000-0000-000000000002', 'TRK-2026-002', 'Bodegón El Centro', '+58 414 9876543', 'Av. Intercomunal Cabudare-Barquisimeto, Sector La Mora', 10.0420, -69.2740, 'NORMAL', 'PENDING'),
-    ('10000000-0000-0000-0000-000000000003', 'TRK-2026-003', 'Centro Médico Valle Hondo', '+58 424 5556677', 'Urb. Valle Hondo, Calle 3, Cabudare', 10.0460, -69.2810, 'URGENT', 'PENDING'),
-    ('10000000-0000-0000-0000-000000000004', 'TRK-2026-004', 'Comercial Los Cardones', '+58 416 3334455', 'Av. Los Leones c/ Av. Lara, Barquisimeto Este', 10.0620, -69.2980, 'NORMAL', 'PENDING')
-ON CONFLICT (tracking_number) DO UPDATE SET dest_lat = EXCLUDED.dest_lat, dest_lng = EXCLUDED.dest_lng;
+-- 9. Limpieza de Tablas de Negocio (0 Órdenes, 0 Rutas, 0 Bitácoras)
+TRUNCATE TABLE order_status_logs, delivery_routes, orders CASCADE;

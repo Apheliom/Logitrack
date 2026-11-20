@@ -101,3 +101,17 @@ logitrack/
   * Lecturas concurrentes con `Promise.all` para eliminar cascadas (waterfalls).
   * Renderizado condicional mediante ternarios estrictos (`condition ? <A /> : null`).
   * Micro-skeletons con `aria-busy` durante estados de carga para eliminar saltos de maquetación (CLS).
+
+
+## 9. Depuración de Base de Datos (Limpieza de Órdenes y Preservación de Cuentas de Acceso)
+* **Estructura DDL Completa:** Conservación íntegra de las tablas `users`, `drivers`, `orders`, `delivery_routes` y `order_status_logs`.
+* **Cuentas de Entrada (Credenciales Base):** Se mantienen exclusivamente los 3 usuarios esenciales de entrada para autenticación JWT (`admin@logitrack.com`, `driver1@logitrack.com` y `cliente@logitrack.com`) junto con el registro operativo de `drivers` en Cabudare Centro (`10.0305, -69.2635`).
+* **Depuración de Datos Ficticios:** Eliminación total de inserciones de prueba en la tabla `orders`, garantizando que la base de datos inicie con 0 pedidos, 0 rutas archivadas y 0 bitácoras simuladas.
+
+
+## 10. Metadatos Open Graph, Favicon y Previsualización Social (WhatsApp/Browser)
+* **Diagnóstico de Previsualización:** En `client/index.html` no existía etiqueta `<link rel="icon">` (mostrando el icono genérico de globo terráqueo en la pestaña del navegador) ni etiquetas meta Open Graph (`og:title`, `og:description`, `og:image`), provocando que al compartir la URL `https://securitrace-op7o.onrender.com/` en WhatsApp o mensajería no se mostrara miniatura, logo ni descripción.
+* **Solución de Identidad de Marca:**
+  * Creación de `client/public/favicon.svg` y `favicon.png` utilizando el isotipo oficial del pin vectorial de LogiTrack.
+  * Generación de `client/public/og-image.png` (1200x630 px) con Pillow, integrando el logotipo, gradiente tecnológico y tipografía de identidad.
+  * Configuración completa de metaetiquetas en `client/index.html` (`description`, `og:title`, `og:description`, `og:image`, `twitter:card`).

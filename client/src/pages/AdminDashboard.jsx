@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { api } from '../api/client';
 import { useSocket } from '../context/SocketContext';
 import { LiveFleetMap } from '../components/Map/LiveFleetMap';
@@ -7,7 +8,7 @@ import { Badge } from '../components/UI/Badge';
 import { MetricCard } from '../components/UI/MetricCard';
 import {
   Package, Truck, CheckCircle2, Clock, Play, Square,
-  Zap, Plus, RefreshCw, ArrowUpRight
+  Zap, Plus, RefreshCw, ArrowUpRight, ArrowRight, ShieldCheck
 } from 'lucide-react';
 
 export const AdminDashboard = () => {
@@ -17,10 +18,7 @@ export const AdminDashboard = () => {
   const [simRunning, setSimRunning] = useState(false);
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
-  const [selDriver, setSelDriver] = useState('');
   const [filterStatus, setFilterStatus] = useState('ALL');
-  const [optimizing, setOptimizing] = useState(false);
-  const [optMsg, setOptMsg] = useState('');
   const { socket } = useSocket();
 
   const loadAll = async () => {
@@ -33,10 +31,7 @@ export const AdminDashboard = () => {
         api.get('/routes/simulator/status'),
       ]);
       if (oRes.success) setOrders(oRes.orders || []);
-      if (dRes.success) {
-        setDrivers(dRes.drivers || []);
-        if (!selDriver && dRes.drivers.length) setSelDriver(dRes.drivers[0].id);
-      }
+      if (dRes.success) setDrivers(dRes.drivers || []);
       if (rRes.success && rRes.routes.length) setActiveRoute(rRes.routes[0]);
       if (sRes.success) setSimRunning(sRes.simulator.isRunning);
     } catch (e) { console.error(e); }
@@ -56,16 +51,6 @@ export const AdminDashboard = () => {
   const toggleSim = async () => {
     const r = await api.post('/routes/simulator/toggle', { action: simRunning ? 'stop' : 'start' });
     if (r.success) setSimRunning(r.simulator.isRunning);
-  };
-
-  const handleOptimize = async () => {
-    if (!selDriver) return;
-    setOptimizing(true); setOptMsg('');
-    try {
-      const r = await api.post('/routes/optimize', { driver_id: selDriver });
-      if (r.success) { setActiveRoute(r.route); setOptMsg(`Ruta óptima: ${r.summary.totalDistanceKm} km · ~${r.summary.estimatedDurationMinutes} min`); loadAll(); }
-    } catch (e) { setOptMsg(`Error: ${e.message}`); }
-    finally { setOptimizing(false); }
   };
 
   const metrics = {
@@ -128,45 +113,42 @@ export const AdminDashboard = () => {
         {/* Right column */}
         <div className="space-y-4">
 
-          {/* Route optimizer card */}
+          {/* Quick Fleet & Driver Management Card */}
           <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-xs space-y-4">
-            <div>
-              <div className="flex items-center gap-2 mb-1">
-                <div className="p-1.5 rounded-lg bg-blue-50 text-blue-600">
-                  <Zap className="w-4 h-4" strokeWidth={2.2} />
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="p-2 rounded-xl bg-blue-50 text-blue-600">
+                  <Truck className="w-4 h-4" strokeWidth={2.2} />
                 </div>
-                <h3 className="text-sm font-bold text-slate-900">Optimizador de Ruta (2-opt)</h3>
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900">Control de Flota</h3>
+                  <p className="text-[11px] text-slate-500">Rutas 2-opt calculadas en tiempo real</p>
+                </div>
               </div>
-              <p className="text-xs text-slate-500">
-                Calcula la secuencia más corta para reducir distancias y consumo.
-              </p>
+              <span className="flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                Auto-Ruta
+              </span>
             </div>
 
-            <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-slate-700">Conductor Asignado</label>
-              <select
-                className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition"
-                value={selDriver}
-                onChange={e => setSelDriver(e.target.value)}
-              >
-                {drivers.map(d => <option key={d.id} value={d.id}>{d.full_name} · {d.vehicle_type}</option>)}
-              </select>
+            <div className="p-3 bg-slate-50 rounded-2xl border border-slate-100 text-xs text-slate-600 space-y-1">
+              <div className="flex justify-between">
+                <span>Almacén Central:</span>
+                <span className="font-semibold text-slate-900">Cabudare Centro</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Algoritmo Activo:</span>
+                <span className="font-semibold text-blue-700">Heurística 2-Opt Automática</span>
+              </div>
             </div>
 
-            <button
-              onClick={handleOptimize}
-              disabled={optimizing}
-              className="w-full flex items-center justify-center gap-2 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white font-semibold text-sm rounded-xl transition shadow-xs"
+            <Link
+              to="/admin/drivers"
+              className="w-full flex items-center justify-center gap-2 py-2.5 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 font-semibold text-xs rounded-xl transition shadow-xs"
             >
-              <Zap className="w-4 h-4" strokeWidth={2} />
-              <span>{optimizing ? 'Optimizando con 2-opt…' : 'Calcular Ruta Óptima'}</span>
-            </button>
-
-            {optMsg && (
-              <div className="text-xs text-blue-800 bg-blue-50/80 border border-blue-200 rounded-xl p-3">
-                {optMsg}
-              </div>
-            )}
+              <span>Ver Rendimiento y Modificar Choferes</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </Link>
           </div>
 
           {/* Drivers status */}

@@ -168,10 +168,18 @@ export const CustomerStorePage = () => {
     setError(null);
 
     try {
-      const summaryItems = Object.entries(cart).map(([id, qty]) => {
+      const detailedItems = Object.entries(cart).map(([id, qty]) => {
         const prod = PRODUCTS.find((p) => p.id === id);
-        return `${qty}x ${prod?.name || id}`;
-      }).join(', ');
+        return {
+          id,
+          name: prod?.name || id,
+          category: prod?.category || 'General',
+          price: prod?.price || 0,
+          quantity: qty
+        };
+      });
+
+      const summaryItems = detailedItems.map(item => `${item.quantity}x ${item.name}`).join(', ');
 
       const payload = {
         client_name: customerData.client_name || 'Cliente Registrado',
@@ -180,6 +188,8 @@ export const CustomerStorePage = () => {
         dest_lat: parseFloat(customerData.dest_lat),
         dest_lng: parseFloat(customerData.dest_lng),
         priority: customerData.priority,
+        total_amount: Number(totalPrice.toFixed(2)),
+        order_items: detailedItems,
         delivery_notes: `Pedido Express Tienda: ${summaryItems} (Total: $${totalPrice.toFixed(2)})`
       };
 

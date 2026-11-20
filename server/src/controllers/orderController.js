@@ -69,7 +69,9 @@ const createOrder = async (req, res) => {
       dest_lng,
       priority = 'NORMAL',
       delivery_notes,
-      assigned_driver_id
+      assigned_driver_id,
+      total_amount = 0.00,
+      order_items = []
     } = req.body;
 
     if (!client_name || !delivery_address || dest_lat === undefined || dest_lng === undefined) {
@@ -88,8 +90,8 @@ const createOrder = async (req, res) => {
 
       const result = await client.query(
         `INSERT INTO orders 
-         (tracking_number, client_name, client_phone, delivery_address, dest_lat, dest_lng, priority, status, assigned_driver_id, delivery_notes)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+         (tracking_number, client_name, client_phone, delivery_address, dest_lat, dest_lng, priority, status, assigned_driver_id, delivery_notes, total_amount, order_items)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
          RETURNING *`,
         [
           trackingNumber,
@@ -101,7 +103,9 @@ const createOrder = async (req, res) => {
           priority,
           initialStatus,
           assigned_driver_id || null,
-          delivery_notes || null
+          delivery_notes || null,
+          Number(total_amount) || 0.00,
+          JSON.stringify(order_items || [])
         ]
       );
 
@@ -414,19 +418,21 @@ const getMyOrders = async (req, res) => {
 
 const getAnalyticsAndAudit = async (req, res) => {
   try {
-    // 1. Métricas de órdenes y Satisfacción del Cliente
+    // 1. Métricas de órdenes y Satisfacción del Cliente (100% dinámicas de PostgreSQL)
     const ordersRes = await db.query(`
       SELECT 
         COUNT(*)::int AS total_orders,
         COUNT(CASE WHEN status = 'DELIVERED' THEN 1 END)::int AS delivered_count,
         COUNT(CASE WHEN status = 'IN_TRANSIT' THEN 1 END)::int AS transit_count,
         COUNT(CASE WHEN status = 'PENDING' THEN 1 END)::int AS pending_count,
-        ROUND(COALESCE(AVG(client_rating), 5.0), 1)::float AS avg_rating,
-        COUNT(CASE WHEN client_confirmed_received = true THEN 1 END)::int AS confirmed_by_client_count
+        COALESCE(ROUND(AVG(client_rating), 1), 0.0)::float AS avg_rating,
+        COUNT(CASE WHEN client_confirmed_received = true THEN 1 END)::int AS confirmed_by_client_count,
+        COALESCE(SUM(total_amount), 0.0)::float AS total_revenue,
+        COALESCE(ROUND(AVG(CASE WHEN delivered_at IS NOT NULL THEN EXTRACT(EPOCH FROM (delivered_at - created_at))/60 END), 1), 0.0)::float AS avg_delivery_time_minutes
       FROM orders
     `);
 
-    // 2. Bitácora de Auditoría (order_status_logs)
+    // 2. Bitácora de Auditoría real
     const auditRes = await db.query(`
       SELECT l.id, l.order_id, l.previous_status, l.new_status, l.notes, l.created_at,
              o.tracking_number, o.client_name, o.client_rating, o.client_confirmed_received,
@@ -438,28 +444,45 @@ const getAnalyticsAndAudit = async (req, res) => {
       LIMIT 40
     `);
 
-    // 3. Ranking de Productos Más Vendidos
-    const topProducts = [
-      { name: 'Teclado y Mouse Inalámbrico Pro', units: 18, revenue: 810.00, category: 'Tecnología' },
-      { name: 'Auriculares con Cancelación Activa', units: 14, revenue: 952.00, category: 'Audio' },
-      { name: 'Pack Café de Especialidad 500g', units: 22, revenue: 396.00, category: 'Gourmet' },
-      { name: 'Botiquín de Primeros Auxilios Pro', units: 9, revenue: 256.50, category: 'Salud' },
-      { name: 'Kit Herramientas de Precisión 24 en 1', units: 7, revenue: 224.00, category: 'Ferretería' },
-    ];
+    // 3. Ranking de Productos Más Vendidos (calculado desde order_items en orders)
+    let topProducts = [];
+    try {
+      const productsRes = await db.query(`
+        SELECT 
+          item->>'name' AS name,
+          COALESCE(item->>'category', 'General') AS category,
+          SUM(COALESCE((item->>'quantity')::int, 1))::int AS units,
+          ROUND(SUM(COALESCE((item->>'price')::numeric * COALESCE((item->>'quantity')::int, 1), 0.00)), 2)::float AS revenue
+        FROM orders o,
+        jsonb_array_elements(CASE WHEN jsonb_typeof(o.order_items) = 'array' THEN o.order_items ELSE '[]'::jsonb END) AS item
+        GROUP BY item->>'name', item->>'category'
+        ORDER BY units DESC, revenue DESC
+        LIMIT 10
+      `);
+      topProducts = productsRes.rows;
+    } catch (pe) {
+      topProducts = [];
+    }
 
     const stats = ordersRes.rows[0];
-    const totalRevenue = topProducts.reduce((acc, p) => acc + p.revenue, 0);
+    const totalOrders = stats.total_orders || 0;
+    const deliveredCount = stats.delivered_count || 0;
+    const onTimeRatePercentage = totalOrders > 0
+      ? Number(((deliveredCount / totalOrders) * 100).toFixed(1))
+      : 0.0;
 
     return res.status(200).json({
       success: true,
       metrics: {
-        totalOrders: stats.total_orders,
-        deliveredCount: stats.delivered_count,
-        transitCount: stats.transit_count,
-        pendingCount: stats.pending_count,
-        totalRevenue,
-        avgDeliveryTimeMinutes: 26.4,
-        onTimeRatePercentage: 94.2
+        totalOrders,
+        deliveredCount,
+        transitCount: stats.transit_count || 0,
+        pendingCount: stats.pending_count || 0,
+        totalRevenue: stats.total_revenue || 0.0,
+        avgDeliveryTimeMinutes: stats.avg_delivery_time_minutes || 0.0,
+        onTimeRatePercentage,
+        avgRating: stats.avg_rating || 0.0,
+        confirmedByClientCount: stats.confirmed_by_client_count || 0
       },
       topProducts,
       auditLogs: auditRes.rows
